@@ -80,6 +80,14 @@ func TestSearchContextAndPassThrough(t *testing.T) {
 	if strings.TrimSpace(filteredOut) != "" {
 		t.Fatalf("expected filtered search to return no matches, got: %s", filteredOut)
 	}
+
+	dashPatternOut, err := runCommand(app, []string{"search", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir, "--", "-X"})
+	if err != nil {
+		t.Fatalf("unexpected error for dash pattern: %v", err)
+	}
+	if strings.TrimSpace(dashPatternOut) != "" {
+		t.Fatalf("expected dash pattern search to return no matches, got: %s", dashPatternOut)
+	}
 }
 
 func TestSearchDefaultsToAll(t *testing.T) {

@@ -26,7 +26,10 @@ func newSearchCmd(app *App) *cobra.Command {
 				return cobra.ExactArgs(1)(cmd, args)
 			}
 			if dash == 0 {
-				return fmt.Errorf("pattern is required before --")
+				if len(args) < 1 {
+					return fmt.Errorf("pattern is required")
+				}
+				return nil
 			}
 			if dash > 1 {
 				return fmt.Errorf("expected a single <pattern> before --")
@@ -41,10 +44,15 @@ func newSearchCmd(app *App) *cobra.Command {
 				if dash > len(args) {
 					dash = len(args)
 				}
-				if dash >= 1 {
+				if dash == 0 {
 					pattern = args[0]
+					if len(args) > 1 {
+						passArgs = append(passArgs, args[1:]...)
+					}
+				} else {
+					pattern = args[0]
+					passArgs = append(passArgs, args[dash:]...)
 				}
-				passArgs = append(passArgs, args[dash:]...)
 			} else if len(args) > 0 {
 				pattern = args[0]
 			}
