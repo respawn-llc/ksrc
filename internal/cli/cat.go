@@ -113,5 +113,5 @@ func findFileInJars(sources []resolve.SourceJar, inner string) (string, string, 
 			return s.Path, inner, nil
 		}
 	}
-	return "", "", fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search --module group:artifact -q \"<pattern>\" to get a file-id", inner)
+	return "", "", fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id", inner)
 }

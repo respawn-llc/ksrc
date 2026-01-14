@@ -6,22 +6,22 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 
 ## Command Overview
 
-### `ksrc search <module>`
-Search dependency sources for a target module or group.
+### `ksrc search <pattern>`
+Search dependency sources for a pattern, optionally filtered by module/group.
 
 **Usage**
 ```
-ksrc search [<module>] -q <pattern> [flags] [-- <rg-args>]
+ksrc search <pattern> [flags] [-- <rg-args>]
 ```
-`<module>` is required unless `--all` is provided. Supports glob patterns (same as `--module`).
+If no selector is provided, `ksrc` defaults to `--all`. Use `--module`/`--group`/`--artifact`/`--version` to narrow scope.
 
 **Key Flags**
 - `--project <path>`: Project root (default: `.`)
-- `--all`: Search across all resolved dependencies (required if `<module>` is omitted)
+- `--all`: Search across all resolved dependencies (default when no module/group/artifact/version is set)
 - `--subproject <name>`: Limit resolution to a subproject (repeatable)
 - `--targets <list>`: Limit KMP targets (comma‑separated, e.g. `jvm,android,iosX64`)
 - `--config <name>`: Dependency configuration(s) or glob patterns to resolve (comma‑separated; default: inferred)
-- `--module <glob>`: Filter by `group:artifact` glob (alias of positional `<module>`)
+- `--module <glob>`: Filter by `group:artifact` glob
 - `--group <glob>`: Filter by group
 - `--artifact <glob>`: Filter by artifact
 - `--version <glob>`: Filter by version

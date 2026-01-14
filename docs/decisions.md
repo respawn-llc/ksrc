@@ -6,7 +6,7 @@ This file records non-obvious decisions, tradeoffs, and architecture notes. Upda
 Provide single-command search and file read for Kotlin dependency sources, without mutating the project and without a ksrc cache/index.
 
 ## Goals
-- One-liner search (`ksrc search <module> -q "<pattern>"`).
+- One-liner search (`ksrc search "<pattern>" --module group:artifact` or `ksrc search "<pattern>"`).
 - One-liner file read (`ksrc cat <file-id>` or `ksrc open <file-id>`).
 - Deterministic dependency resolution using the project graph.
 - Use Gradle caches only; no repo writes.
@@ -55,4 +55,3 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 
 ## Performance Notes
 - Each resolution stage starts Gradle and can be slow.
-

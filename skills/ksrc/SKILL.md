@@ -5,19 +5,18 @@ description: CLI for searching/reading Kotlin dependency sources from a Gradle p
 
 ## Quick start
 - Search a module:
-  `ksrc search org.jetbrains.kotlinx:kotlinx-datetime -q "class LocalDate"`
+  `ksrc search "class LocalDate" --module org.jetbrains.kotlinx:kotlinx-datetime`
 - Read a file by returned id:
   `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
 ## Commands
-### `ksrc search [<module>] -q <pattern> [-- <rg-args>]`
+### `ksrc search <pattern> [-- <rg-args>]`
 Search dependency sources.
 
 Output format: `<file-id> <line>:<col>:<match>`
 
 Common flags:
-- `--all` search across all resolved deps (required if `<module>` omitted)
-- `<module>` supports glob patterns (same as `--module`)
+- `--all` search across all resolved deps (default when no selector is provided)
 - `--project <path>` project root (default `.`)
 - `--subproject <name>` limit to a subproject (repeatable)
 - `--targets <list>` limit KMP targets (comma‑separated: `jvm,android,iosX64`)
@@ -61,7 +60,6 @@ Basic diagnostics for environment issues.
 `group:artifact:version!/path/inside/jar.kt`
 
 ## Common issues
-- `E_NO_MODULE`: provide `<module>` or pass `--all`.
 - `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
 - Gradle not found: run in a Gradle project or set `--project` to the root.
 - Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow.

@@ -24,7 +24,7 @@ func TestSearchAndCatIntegration(t *testing.T) {
 
 	t.Setenv("KSRC_TEST_JAR", jarPath)
 
-	searchOut, err := runCommand(app, []string{"search", "org.jetbrains.kotlinx:kotlinx-datetime", "-q", "public class LocalDate", "--project", projectDir})
+	searchOut, err := runCommand(app, []string{"search", "public class LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir})
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestSearchContextAndPassThrough(t *testing.T) {
 
 	t.Setenv("KSRC_TEST_JAR", jarPath)
 
-	ctxOut, err := runCommand(app, []string{"search", "org.jetbrains.kotlinx:kotlinx-datetime", "-q", "public class LocalDate", "--project", projectDir, "--context", "1"})
+	ctxOut, err := runCommand(app, []string{"search", "public class LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir, "--context", "1"})
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestSearchContextAndPassThrough(t *testing.T) {
 		t.Fatalf("context lines missing: %s", ctxOut)
 	}
 
-	filteredOut, err := runCommand(app, []string{"search", "org.jetbrains.kotlinx:kotlinx-datetime", "-q", "public class LocalDate", "--project", projectDir, "--", "-g", "!*.kt"})
+	filteredOut, err := runCommand(app, []string{"search", "public class LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir, "--", "-g", "!*.kt"})
 	if err != nil {
 		t.Fatalf("unexpected error for filtered search: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestSearchContextAndPassThrough(t *testing.T) {
 	}
 }
 
-func TestSearchModuleGlobArg(t *testing.T) {
+func TestSearchDefaultsToAll(t *testing.T) {
 	app := NewApp()
 	if _, err := app.Runner.LookPath("rg"); err != nil {
 		t.Skip("rg not available")
@@ -98,7 +98,7 @@ func TestSearchModuleGlobArg(t *testing.T) {
 
 	t.Setenv("KSRC_TEST_JAR", jarPath)
 
-	out, err := runCommand(app, []string{"search", "*datetime*", "-q", "public class LocalDate", "--project", projectDir})
+	out, err := runCommand(app, []string{"search", "public class LocalDate", "--project", projectDir})
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}

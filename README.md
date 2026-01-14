@@ -56,6 +56,16 @@ $skill-installer install https://github.com/respawn-app/ksrc/tree/main/skills/ks
 
 > Use `ksrc` bash command to discover Kotlin/gradle library dependency sources. Start with `ksrc --help`.
 
+## Usage
+
+Search defaults to all dependencies when no selector is provided:
+
+```
+ksrc search "LocalDate"
+ksrc search "LocalDate" --module org.jetbrains.kotlinx:kotlinx-datetime
+ksrc cat <file-id> --lines 1,120
+```
+
 ## License
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License.

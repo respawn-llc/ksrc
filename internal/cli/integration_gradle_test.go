@@ -19,7 +19,7 @@ func TestIntegrationWithRealGradle(t *testing.T) {
 
 	projectDir := filepath.Clean(filepath.Join("..", "..", "testdata", "integration"))
 
-	out, err := runCommand(app, []string{"search", "org.jetbrains.kotlinx:kotlinx-datetime", "-q", "LocalDate", "--project", projectDir})
+	out, err := runCommand(app, []string{"search", "LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir})
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}

@@ -12,51 +12,47 @@ import (
 
 func newSearchCmd(app *App) *cobra.Command {
 	var flags ResolveFlags
-	var query string
 	var rgArgs string
 	var showExtractedPath bool
 	var contextLines int
 
 	cmd := &cobra.Command{
-		Use:     "search [<module>] [-- <rg-args>]",
+		Use:     "search <pattern> [-- <rg-args>]",
 		Aliases: []string{"rg"},
 		Short:   "Search dependency sources",
 		Args: func(cmd *cobra.Command, args []string) error {
 			dash := cmd.Flags().ArgsLenAtDash()
 			if dash == -1 {
-				return cobra.MaximumNArgs(1)(cmd, args)
+				return cobra.ExactArgs(1)(cmd, args)
+			}
+			if dash == 0 {
+				return fmt.Errorf("pattern is required before --")
 			}
 			if dash > 1 {
-				return fmt.Errorf("expected at most one <module> before --")
+				return fmt.Errorf("expected a single <pattern> before --")
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dash := cmd.Flags().ArgsLenAtDash()
-			var moduleArg string
+			var pattern string
 			var passArgs []string
 			if dash >= 0 {
 				if dash > len(args) {
 					dash = len(args)
 				}
-				if dash == 1 {
-					moduleArg = args[0]
+				if dash >= 1 {
+					pattern = args[0]
 				}
 				passArgs = append(passArgs, args[dash:]...)
-			} else if len(args) == 1 {
-				moduleArg = args[0]
+			} else if len(args) > 0 {
+				pattern = args[0]
 			}
-			if moduleArg != "" {
-				if flags.Module != "" && flags.Module != moduleArg {
-					return fmt.Errorf("module specified twice (arg and --module). Use only one.")
-				}
-				flags.Module = moduleArg
+			if strings.TrimSpace(pattern) == "" {
+				return fmt.Errorf("pattern is required. Try: ksrc search \"<pattern>\"")
 			}
-			if err := requireModuleOrAll(flags.Module, flags.All); err != nil {
-				return err
-			}
-			if strings.TrimSpace(query) == "" {
-				return fmt.Errorf("query is required. Try: ksrc search --all -q \"<pattern>\"")
+			if !flags.All && !hasSelector(flags) {
+				flags.All = true
 			}
 			ctx := context.Background()
 			sources, _, meta, err := resolveSources(ctx, app, flags, "", true, true)
@@ -73,7 +69,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			}
 			rgExtra = append(rgExtra, passArgs...)
 			matches, err := search.Run(ctx, app.Runner, search.Options{
-				Pattern: query,
+				Pattern: pattern,
 				Jars:    sources,
 				RGArgs:  rgExtra,
 				WorkDir: flags.Project,
@@ -92,9 +88,8 @@ func newSearchCmd(app *App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&query, "query", "q", "", "search query (required)")
 	cmd.Flags().StringVar(&flags.Project, "project", ".", "project root")
-	cmd.Flags().BoolVar(&flags.All, "all", false, "search all resolved dependencies")
+	cmd.Flags().BoolVar(&flags.All, "all", false, "search all resolved dependencies (default when no module/group/artifact/version is set)")
 	cmd.Flags().StringVar(&flags.Module, "module", "", "module selector (group:artifact[:version])")
 	cmd.Flags().StringVar(&flags.Group, "group", "", "group filter")
 	cmd.Flags().StringVar(&flags.Artifact, "artifact", "", "artifact filter")
@@ -113,4 +108,11 @@ func newSearchCmd(app *App) *cobra.Command {
 	cmd.Flags().IntVar(&contextLines, "context", 0, "show N lines before/after matches (rg -C)")
 
 	return cmd
+}
+
+func hasSelector(flags ResolveFlags) bool {
+	return strings.TrimSpace(flags.Module) != "" ||
+		strings.TrimSpace(flags.Group) != "" ||
+		strings.TrimSpace(flags.Artifact) != "" ||
+		strings.TrimSpace(flags.Version) != ""
 }
