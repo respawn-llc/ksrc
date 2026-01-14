@@ -71,13 +71,6 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 	return sources, lastDeps, meta, nil
 }
 
-func requireModuleOrAll(module string, all bool) error {
-	if strings.TrimSpace(module) == "" && !all {
-		return fmt.Errorf("E_NO_MODULE: <module> required unless --all is provided. Try: ksrc search --all -q \"<pattern>\" or ksrc search group:artifact -q \"<pattern>\"")
-	}
-	return nil
-}
-
 func noSourcesErr(flags ResolveFlags, hint string) error {
 	msg := "E_NO_SOURCES: no sources resolved."
 	var parts []string

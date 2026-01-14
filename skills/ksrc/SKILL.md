@@ -3,21 +3,35 @@ name: ksrc
 description: CLI for searching/reading Kotlin dependency sources from a Gradle project. Use when you need to locate/inspect 3rd-party Gradle libraries.
 ---
 
-## Quick start
-- Search a module:
-  `ksrc search org.jetbrains.kotlinx:kotlinx-datetime -q "class LocalDate"`
-- Read a file by returned id:
+## How to use:
+
+Note: Give this tool generous timeouts. It can take a few minutes to download sources if needed and set up gradle.
+
+1. Search dependencies to retrieve coordinates and matches: `ksrc search "class LocalDate"`
+
+If you want faster execution & less noise, consider adding:
+- `--artifact` to limit search to one artifact, (or `--module` to also limit by version)
+- `--subproject` to help discovery for monorepos/large modular apps
+- `--targets` to limit to specific KMP targets. 
+
+2. Read a file by returned id:
   `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
+## Common issues
+- If, unexpectedly, no matches are found, try `cd` ing into a relevant project (if in composite build), specifying a scope `--scope` (esp. for build-time deps), or `ksrc doctor`.
+- `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
+- Gradle not found: run in a Gradle project or set `--project` to the root.
+- Gradle files with unresolved class version: User's Local java in env is resolved to something unsupported by gradle. Help them fix Gradle<>JDK incompatibility.
+- Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow scope.
+
 ## Commands
-### `ksrc search [<module>] -q <pattern> [-- <rg-args>]`
+### `ksrc search <pattern> [-- <rg-args>]`
 Search dependency sources.
 
 Output format: `<file-id> <line>:<col>:<match>`
 
 Common flags:
-- `--all` search across all resolved deps (required if `<module>` omitted)
-- `<module>` supports glob patterns (same as `--module`)
+- `--all` search across all resolved deps (default when no selector is provided)
 - `--project <path>` project root (default `.`)
 - `--subproject <name>` limit to a subproject (repeatable)
 - `--targets <list>` limit KMP targets (comma‑separated: `jvm,android,iosX64`)
@@ -59,9 +73,3 @@ Basic diagnostics for environment issues.
 
 ## File-id format
 `group:artifact:version!/path/inside/jar.kt`
-
-## Common issues
-- `E_NO_MODULE`: provide `<module>` or pass `--all`.
-- `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
-- Gradle not found: run in a Gradle project or set `--project` to the root.
-- Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow.
