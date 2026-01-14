@@ -71,7 +71,6 @@ func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (
 					combined.Warnings = append(combined.Warnings, "resolved sources from buildSrc")
 					return combined, nil
 				}
-				combined.Warnings = append(combined.Warnings, "buildSrc resolved but no sources matched")
 			}
 		}
 	}
