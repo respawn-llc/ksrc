@@ -68,3 +68,6 @@ tmp/
 
 # Local notes
 TODO.md
+
+# Local dev scripts
+scripts/ksrc
