@@ -31,9 +31,15 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 	var mergedDeps []resolve.Coord
 	seenSources := make(map[string]struct{})
 	seenDeps := make(map[string]struct{})
+	var gradleErr *gradle.ExecError
 	for _, attempt := range attempts {
 		res, err := gradle.Resolve(ctx, app.Runner, attempt.Options)
 		if err != nil {
+			if execErr, ok := gradle.AsExecError(err); ok {
+				gradleErr = execErr
+				meta.Warnings = append(meta.Warnings, gradleFailureWarnings(app.Verbose, execErr)...)
+				break
+			}
 			return nil, nil, meta, err
 		}
 		meta.Attempts = append(meta.Attempts, attempt.Label)
@@ -52,6 +58,14 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 		if len(sources) > 0 || (!applyFilters && len(res.Deps) > 0) {
 			return sources, res.Deps, meta, nil
 		}
+	}
+
+	if gradleErr != nil {
+		sources, deps, err := cacheFallbackSources(flags, dep, applyFilters)
+		if err != nil {
+			meta.Warnings = append(meta.Warnings, fmt.Sprintf("Cache-only fallback failed: %v", err))
+		}
+		return sources, deps, meta, nil
 	}
 
 	var sources []resolve.SourceJar
@@ -216,6 +230,101 @@ func mergeSources(dest *[]resolve.SourceJar, seen map[string]struct{}, sources [
 		seen[key] = struct{}{}
 		*dest = append(*dest, s)
 	}
+}
+
+func gradleFailureWarnings(verbose bool, execErr *gradle.ExecError) []string {
+	warnings := []string{"Gradle failed; rerun with -v to see Gradle output. Falling back to cache-only resolution."}
+	if !verbose || execErr == nil {
+		return warnings
+	}
+	output := strings.TrimSpace(execErr.Stderr)
+	if output == "" {
+		output = strings.TrimSpace(execErr.Stdout)
+	}
+	if output == "" {
+		return warnings
+	}
+	warnings = append(warnings, "Gradle output:")
+	warnings = append(warnings, splitLines(output)...)
+	return warnings
+}
+
+func splitLines(input string) []string {
+	lines := strings.Split(input, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimRight(line, "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+func cacheFallbackSources(flags ResolveFlags, dep string, applyFilters bool) ([]resolve.SourceJar, []resolve.Coord, error) {
+	var sources []resolve.SourceJar
+	var err error
+
+	if dep != "" {
+		coord, err := resolve.ParseCoord(dep)
+		if err != nil {
+			return nil, nil, err
+		}
+		sources, err = resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else if flags.All || !hasExactSelector(flags) {
+		sources, err = resolve.FindAllCachedSources()
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		coord, _ := resolve.SelectorToCoord(flags.Module, flags.Group, flags.Artifact, flags.Version)
+		sources, err = resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if applyFilters {
+		sources = resolve.FilterSources(sources, flags.Module, flags.Group, flags.Artifact, flags.Version)
+	}
+	return sources, collectCoords(sources), nil
+}
+
+func hasExactSelector(flags ResolveFlags) bool {
+	coord, ok := resolve.SelectorToCoord(flags.Module, flags.Group, flags.Artifact, flags.Version)
+	if !ok {
+		return false
+	}
+	return isExactToken(coord.Group) && isExactToken(coord.Artifact) && isExactToken(coord.Version)
+}
+
+func isExactToken(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return true
+	}
+	if strings.ContainsAny(value, "*?[]") {
+		return false
+	}
+	return !strings.Contains(value, ",")
+}
+
+func collectCoords(sources []resolve.SourceJar) []resolve.Coord {
+	seen := make(map[string]struct{})
+	out := make([]resolve.Coord, 0, len(sources))
+	for _, s := range sources {
+		key := s.Coord.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, s.Coord)
+	}
+	return out
 }
 
 func mergeDeps(dest *[]resolve.Coord, seen map[string]struct{}, deps []resolve.Coord) {

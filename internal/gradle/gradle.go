@@ -147,7 +147,7 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 
 	stdout, stderr, err := runner.Run(ctx, opts.ProjectDir, gradleCmd, args...)
 	if err != nil {
-		return ResolveResult{}, fmt.Errorf("gradle failed: %w\n%s", err, strings.TrimSpace(stderr))
+		return ResolveResult{}, &ExecError{Err: err, Stdout: stdout, Stderr: stderr}
 	}
 
 	result := ResolveResult{}

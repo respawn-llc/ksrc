@@ -6,6 +6,9 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 
 ## Command Overview
 
+## Global Flags
+- `-v, --verbose`: Show verbose output (including Gradle failure output)
+
 ### `ksrc search <pattern>`
 Search dependency sources for a pattern, optionally filtered by module/group.
 

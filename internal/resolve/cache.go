@@ -43,6 +43,49 @@ func FindCachedSources(group, artifact, version string) ([]SourceJar, error) {
 	return out, nil
 }
 
+func FindAllCachedSources() ([]SourceJar, error) {
+	cacheDir, err := GradleCacheDir()
+	if err != nil {
+		return nil, err
+	}
+	var out []SourceJar
+	err = filepath.WalkDir(cacheDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(d.Name(), "-sources.jar") {
+			return nil
+		}
+		rel, err := filepath.Rel(cacheDir, path)
+		if err != nil {
+			return err
+		}
+		parts := strings.Split(rel, string(filepath.Separator))
+		if len(parts) < 5 {
+			return nil
+		}
+		version := parts[len(parts)-3]
+		artifact := parts[len(parts)-4]
+		groupParts := parts[:len(parts)-4]
+		if len(groupParts) == 0 {
+			return nil
+		}
+		group := strings.Join(groupParts, ".")
+		out = append(out, SourceJar{
+			Coord: Coord{Group: group, Artifact: artifact, Version: version},
+			Path:  path,
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func HighestCachedVersion(groupArtifactDir string) (string, error) {
 	entries, err := os.ReadDir(groupArtifactDir)
 	if err != nil {
