@@ -239,6 +239,9 @@ func mergeSources(dest *[]resolve.SourceJar, seen map[string]struct{}, sources [
 
 func gradleFailureWarnings(verbose bool, execErr *gradle.ExecError) []string {
 	warnings := []string{"Gradle failed; rerun with -v to see Gradle output. Falling back to cache-only resolution."}
+	if verbose {
+		warnings[0] = "Gradle failed. Falling back to cache-only resolution."
+	}
 	if !verbose || execErr == nil {
 		return warnings
 	}
