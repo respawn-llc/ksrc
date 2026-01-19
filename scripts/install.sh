@@ -170,7 +170,15 @@ esac
 
 mkdir -p "$bin_dir"
 target="$bin_dir/ksrc"
-if [ -f "$target" ]; then
+if [ -e "$target" ]; then
+  if [ -d "$target" ]; then
+    echo "Refusing to overwrite directory $target" >&2
+    exit 1
+  fi
+  if [ -L "$target" ]; then
+    echo "Refusing to overwrite symlink $target" >&2
+    exit 1
+  fi
   echo "Warning: overwriting existing $target" >&2
 fi
 install -m 755 "$tmpdir/$bin_name" "$target"
