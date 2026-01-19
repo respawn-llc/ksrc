@@ -65,6 +65,11 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 		if err != nil {
 			meta.Warnings = append(meta.Warnings, fmt.Sprintf("Cache-only fallback failed: %v", err))
 		}
+		if flags.All && (len(mergedSources) > 0 || (!applyFilters && len(mergedDeps) > 0)) {
+			mergeSources(&mergedSources, seenSources, sources)
+			mergeDeps(&mergedDeps, seenDeps, deps)
+			return mergedSources, mergedDeps, meta, nil
+		}
 		return sources, deps, meta, nil
 	}
 
