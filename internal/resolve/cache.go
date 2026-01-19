@@ -21,7 +21,7 @@ func FindCachedSources(group, artifact, version string) ([]SourceJar, error) {
 	if err != nil {
 		return nil, err
 	}
-	groupPath := filepath.Join(cacheDir, filepath.FromSlash(strings.ReplaceAll(group, ".", "/")), artifact)
+	groupPath := filepath.Join(cacheDir, group, artifact)
 	if version == "" {
 		version, err = HighestCachedVersion(groupPath)
 		if err != nil {

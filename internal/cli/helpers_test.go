@@ -26,7 +26,7 @@ func TestResolveSourcesFallsBackToCacheOnGradleFailure(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 
-	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com", "example", "demo", "1.0.0", "hash")
+	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		t.Fatalf("mkdir cache dir: %v", err)
 	}
