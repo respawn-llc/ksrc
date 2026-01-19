@@ -45,7 +45,8 @@ func newDoctorCmd(app *App) *cobra.Command {
 
 			_, err = gradle.Resolve(context.Background(), app.Runner, gradle.ResolveOptions{ProjectDir: project})
 			if err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "gradle resolve: error: %v\n", err)
+				fmt.Fprintf(cmd.OutOrStdout(), "issue: gradle resolve failed: %v\n", err)
+				fmt.Fprintf(cmd.OutOrStdout(), "suggestion: fix Gradle project (sync/build), then rerun ksrc\n")
 			} else {
 				fmt.Fprintf(cmd.OutOrStdout(), "gradle resolve: ok\n")
 			}

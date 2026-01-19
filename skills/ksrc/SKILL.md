@@ -21,7 +21,7 @@ If you want faster execution & less noise, consider adding:
 - If, unexpectedly, no matches are found, try `cd` ing into a relevant project (if in composite build), specifying a scope `--scope` (esp. for build-time deps), or `ksrc doctor`.
 - `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
 - Gradle not found: run in a Gradle project or set `--project` to the root.
-- Gradle resolution failures: re-run with `-v` to see Gradle output for debugging.
+- Gradle resolution failures: `ksrc` falls back to cache-only resolution and warns; re-run with `-v` to see Gradle output for debugging.
 - Gradle files with unresolved class version: User's Local java in env is resolved to something unsupported by gradle. Help them fix Gradle<>JDK incompatibility.
 - Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow scope.
 
