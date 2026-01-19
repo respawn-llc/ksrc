@@ -42,3 +42,43 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+  smoke-sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: current
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Install ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
+      - name: Build ksrc binary
+        run: go build -o ./bin/ksrc ./cmd/ksrc
+
+      - name: Smoke test against sample project
+        run: ./bin/ksrc search LocalDate --module org.jetbrains.kotlinx:kotlinx-datetime --project ./sample
