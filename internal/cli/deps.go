@@ -18,7 +18,7 @@ func newDepsCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			emitWarnings(cmd, meta)
+			emitDiagnostics(cmd, meta, app.Verbose)
 			sourceByCoord := make(map[string]string)
 			for _, s := range sources {
 				sourceByCoord[s.Coord.String()] = s.Path

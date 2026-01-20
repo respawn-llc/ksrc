@@ -6,9 +6,14 @@ import (
 )
 
 type ExecError struct {
-	Err    error
-	Stdout string
-	Stderr string
+	Err         error
+	Stdout      string
+	Stderr      string
+	Cmd         string
+	Args        []string
+	ProjectDir  string
+	ProjectPath string
+	Invocation  []string
 }
 
 func (e *ExecError) Error() string {

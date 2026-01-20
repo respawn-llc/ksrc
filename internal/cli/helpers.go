@@ -15,6 +15,7 @@ type ResolveMeta struct {
 	Attempts            []string
 	TriedConfigPatterns []string
 	Warnings            []string
+	Verbose             []string
 }
 
 func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep string, applyFilters bool, allowCacheFallback bool) ([]resolve.SourceJar, []resolve.Coord, ResolveMeta, error) {
@@ -23,9 +24,24 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 	}
 	opts := flags.ToOptions()
 	opts.Dep = dep
+	opts.Verbose = app.Verbose
 
 	meta := ResolveMeta{}
 	attempts := buildResolveAttempts(opts, flags)
+	if app.Verbose {
+		labels := make([]string, 0, len(attempts))
+		for _, attempt := range attempts {
+			labels = append(labels, attempt.Label)
+		}
+		if len(labels) > 0 {
+			meta.Verbose = append(meta.Verbose, fmt.Sprintf("Resolve attempts: %s", strings.Join(labels, ", ")))
+		}
+		if strings.TrimSpace(flags.Config) != "" && len(attempts) == 1 {
+			meta.Verbose = append(meta.Verbose, "Skipped debug config attempts because --config was provided.")
+		} else if opts.Scope != "compile" && opts.Scope != "runtime" && len(attempts) == 1 {
+			meta.Verbose = append(meta.Verbose, fmt.Sprintf("Skipped debug config attempts for scope=%s.", opts.Scope))
+		}
+	}
 	var lastDeps []resolve.Coord
 	var mergedSources []resolve.SourceJar
 	var mergedDeps []resolve.Coord
@@ -33,10 +49,19 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 	seenDeps := make(map[string]struct{})
 	var gradleErr *gradle.ExecError
 	for _, attempt := range attempts {
+		if app.Verbose {
+			meta.Verbose = append(meta.Verbose, fmt.Sprintf("Attempt %s: %s", attempt.Label, formatAttemptConfigs(attempt.Options.Configs)))
+		}
 		res, err := gradle.Resolve(ctx, app.Runner, attempt.Options)
 		if err != nil {
 			if execErr, ok := gradle.AsExecError(err); ok {
 				gradleErr = execErr
+				if app.Verbose {
+					if len(execErr.Invocation) > 0 {
+						meta.Verbose = append(meta.Verbose, execErr.Invocation...)
+					}
+					meta.Verbose = append(meta.Verbose, fmt.Sprintf("Attempt %s failed; skipping remaining attempts.", attempt.Label))
+				}
 				meta.Warnings = append(meta.Warnings, gradleFailureWarnings(app.Verbose, execErr)...)
 				break
 			}
@@ -45,22 +70,40 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 		meta.Attempts = append(meta.Attempts, attempt.Label)
 		meta.TriedConfigPatterns = append(meta.TriedConfigPatterns, attempt.ConfigPatterns...)
 		meta.Warnings = append(meta.Warnings, res.Warnings...)
+		if len(res.Verbose) > 0 {
+			meta.Verbose = append(meta.Verbose, res.Verbose...)
+		}
 		lastDeps = res.Deps
 		sources := res.Sources
 		if applyFilters {
 			sources = resolve.FilterSources(sources, flags.Module, flags.Group, flags.Artifact, flags.Version)
 		}
+		if app.Verbose {
+			meta.Verbose = append(meta.Verbose, fmt.Sprintf("Attempt %s result: sources=%d filtered=%d deps=%d", attempt.Label, len(res.Sources), len(sources), len(res.Deps)))
+		}
 		if flags.All {
 			mergeSources(&mergedSources, seenSources, sources)
 			mergeDeps(&mergedDeps, seenDeps, res.Deps)
+			if app.Verbose {
+				meta.Verbose = append(meta.Verbose, fmt.Sprintf("Attempt %s merged into --all results.", attempt.Label))
+			}
 			continue
 		}
 		if len(sources) > 0 || (!applyFilters && len(res.Deps) > 0) {
+			if app.Verbose {
+				meta.Verbose = append(meta.Verbose, fmt.Sprintf("Attempt %s returned results; skipping remaining attempts.", attempt.Label))
+			}
 			return sources, res.Deps, meta, nil
+		}
+		if app.Verbose {
+			meta.Verbose = append(meta.Verbose, fmt.Sprintf("Attempt %s had no results; continuing.", attempt.Label))
 		}
 	}
 
 	if gradleErr != nil {
+		if app.Verbose {
+			meta.Verbose = append(meta.Verbose, "Gradle failed; using cache-only fallback.")
+		}
 		sources, deps, err := cacheFallbackSources(flags, dep, applyFilters)
 		if err != nil {
 			meta.Warnings = append(meta.Warnings, fmt.Sprintf("Cache-only fallback failed: %v", err))
@@ -68,6 +111,9 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 		if flags.All && (len(mergedSources) > 0 || (!applyFilters && len(mergedDeps) > 0)) {
 			mergeSources(&mergedSources, seenSources, sources)
 			mergeDeps(&mergedDeps, seenDeps, deps)
+			if app.Verbose {
+				meta.Verbose = append(meta.Verbose, "Merged cache fallback into --all results.")
+			}
 			return mergedSources, mergedDeps, meta, nil
 		}
 		return sources, deps, meta, nil
@@ -173,6 +219,13 @@ func buildResolveAttempts(opts gradle.ResolveOptions, flags ResolveFlags) []reso
 	return attempts
 }
 
+func formatAttemptConfigs(configs []string) string {
+	if len(configs) == 0 {
+		return "configs=(default)"
+	}
+	return fmt.Sprintf("configs=%s", strings.Join(configs, ","))
+}
+
 func joinHints(parts ...string) string {
 	var out []string
 	for _, part := range parts {
@@ -216,14 +269,37 @@ func metaHasConfig(meta ResolveMeta, pattern string) bool {
 	return false
 }
 
-func emitWarnings(cmd stderrWriter, meta ResolveMeta) {
+func emitDiagnostics(cmd stderrWriter, meta ResolveMeta, verbose bool) {
 	for _, warning := range meta.Warnings {
 		fmt.Fprintf(cmd.ErrOrStderr(), "WARN: %s\n", warning)
+	}
+	if !verbose {
+		return
+	}
+	for _, line := range meta.Verbose {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "VERBOSE: %s\n", line)
 	}
 }
 
 type stderrWriter interface {
 	ErrOrStderr() io.Writer
+}
+
+func emitVerbose(cmd stderrWriter, verbose bool, lines ...string) {
+	if !verbose {
+		return
+	}
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(), "VERBOSE: %s\n", line)
+	}
 }
 
 func mergeSources(dest *[]resolve.SourceJar, seen map[string]struct{}, sources []resolve.SourceJar) {

@@ -67,7 +67,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			emitWarnings(cmd, meta)
+			emitDiagnostics(cmd, meta, app.Verbose)
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
@@ -76,11 +76,21 @@ func newSearchCmd(app *App) *cobra.Command {
 				rgExtra = append(rgExtra, "-C", strconv.Itoa(contextLines))
 			}
 			rgExtra = append(rgExtra, passArgs...)
+			var report func(search.ExecPlan)
+			if app.Verbose {
+				report = func(plan search.ExecPlan) {
+					emitVerbose(cmd, app.Verbose,
+						fmt.Sprintf("rg: %s %s", plan.Cmd, strings.Join(plan.Args, " ")),
+						fmt.Sprintf("rg jars: %d (mode=%s)", plan.JarCount, plan.Mode),
+					)
+				}
+			}
 			matches, err := search.Run(ctx, app.Runner, search.Options{
 				Pattern: pattern,
 				Jars:    sources,
 				RGArgs:  rgExtra,
 				WorkDir: flags.Project,
+				Report:  report,
 			})
 			if err != nil {
 				return err
