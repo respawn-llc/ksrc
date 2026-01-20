@@ -27,6 +27,15 @@ type Options struct {
 	Jars    []resolve.SourceJar
 	RGArgs  []string
 	WorkDir string
+	Report  func(ExecPlan)
+}
+
+type ExecPlan struct {
+	Cmd      string
+	Args     []string
+	JarCount int
+	Mode     string
+	WorkDir  string
 }
 
 func Run(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
@@ -141,6 +150,15 @@ func runZipSearch(ctx context.Context, runner executil.Runner, opts Options) ([]
 	args = append(args, opts.Pattern)
 	args = append(args, searchJars...)
 
+	if opts.Report != nil {
+		opts.Report(ExecPlan{
+			Cmd:      "rg",
+			Args:     args,
+			JarCount: len(opts.Jars),
+			Mode:     "zip",
+			WorkDir:  opts.WorkDir,
+		})
+	}
 	stdout, stderr, err := runner.Run(ctx, opts.WorkDir, "rg", args...)
 	if err != nil {
 		if isNoMatches(err) {
@@ -195,6 +213,15 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 	args = append(args, opts.Pattern)
 	args = append(args, searchDirs...)
 
+	if opts.Report != nil {
+		opts.Report(ExecPlan{
+			Cmd:      "rg",
+			Args:     args,
+			JarCount: len(opts.Jars),
+			Mode:     "extract",
+			WorkDir:  opts.WorkDir,
+		})
+	}
 	stdout, stderr, err := runner.Run(ctx, opts.WorkDir, "rg", args...)
 	if err != nil {
 		if isNoMatches(err) {

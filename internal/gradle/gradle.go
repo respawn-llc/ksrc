@@ -29,6 +29,7 @@ type ResolveOptions struct {
 	IncludeBuildSrc       bool
 	IncludeBuildscript    bool
 	IncludeIncludedBuilds bool
+	Verbose               bool
 }
 
 type ResolveResult struct {
@@ -36,6 +37,7 @@ type ResolveResult struct {
 	Deps           []resolve.Coord
 	IncludedBuilds []string
 	Warnings       []string
+	Verbose        []string
 }
 
 func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (ResolveResult, error) {
@@ -49,16 +51,28 @@ func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (
 	}
 
 	combined := rootRes
+	if opts.Verbose && len(rootRes.IncludedBuilds) > 0 {
+		combined.Verbose = append(combined.Verbose, fmt.Sprintf("Included builds detected: %s", strings.Join(rootRes.IncludedBuilds, ", ")))
+	}
+	if opts.Verbose && !opts.IncludeIncludedBuilds && len(rootRes.IncludedBuilds) > 0 {
+		combined.Verbose = append(combined.Verbose, "Included builds scanning disabled (--include-builds=false).")
+	}
 	if len(combined.Sources) > 0 {
 		return combined, nil
 	}
 	if opts.Offline {
+		if opts.Verbose {
+			combined.Verbose = append(combined.Verbose, "Offline: skipping buildSrc and included builds.")
+		}
 		return combined, nil
 	}
 
 	if opts.IncludeBuildSrc {
 		buildSrcDir := filepath.Join(opts.ProjectDir, "buildSrc")
 		if shouldResolveBuildSrc(buildSrcDir, opts.ProjectDir, opts.ProjectPath) {
+			if opts.Verbose {
+				combined.Verbose = append(combined.Verbose, fmt.Sprintf("buildSrc scan: %s", buildSrcDir))
+			}
 			buildSrcOpts := rootOpts
 			buildSrcOpts.ProjectPath = buildSrcDir
 			buildSrcOpts.Subprojects = nil
@@ -72,10 +86,17 @@ func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (
 					return combined, nil
 				}
 			}
+		} else if opts.Verbose {
+			combined.Verbose = append(combined.Verbose, fmt.Sprintf("buildSrc skipped: %s", buildSrcDir))
 		}
+	} else if opts.Verbose {
+		combined.Verbose = append(combined.Verbose, "buildSrc scanning disabled (--buildsrc=false).")
 	}
 
 	if opts.IncludeIncludedBuilds && len(rootRes.IncludedBuilds) > 0 {
+		if opts.Verbose {
+			combined.Verbose = append(combined.Verbose, fmt.Sprintf("Included builds queued: %d", len(rootRes.IncludedBuilds)))
+		}
 		buildQueue := append([]string{}, rootRes.IncludedBuilds...)
 		seenBuilds := make(map[string]struct{})
 		for len(buildQueue) > 0 {
@@ -86,9 +107,15 @@ func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (
 			}
 			key := cleanPath(buildDir)
 			if _, exists := seenBuilds[key]; exists {
+				if opts.Verbose {
+					combined.Verbose = append(combined.Verbose, fmt.Sprintf("Included build skipped (duplicate): %s", buildDir))
+				}
 				continue
 			}
 			seenBuilds[key] = struct{}{}
+			if opts.Verbose {
+				combined.Verbose = append(combined.Verbose, fmt.Sprintf("Included build scan: %s", buildDir))
+			}
 
 			buildOpts := opts
 			buildOpts.ProjectDir = buildDir
@@ -145,12 +172,26 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 	args = append(args, buildProps(opts)...) // -P...
 	args = append(args, "ksrcSources")
 
-	stdout, stderr, err := runner.Run(ctx, opts.ProjectDir, gradleCmd, args...)
-	if err != nil {
-		return ResolveResult{}, fmt.Errorf("gradle failed: %w\n%s", err, strings.TrimSpace(stderr))
+	result := ResolveResult{}
+	invocation := formatGradleInvocation(gradleCmd, args, opts.ProjectDir, opts.ProjectPath)
+	if opts.Verbose {
+		result.Verbose = append(result.Verbose, invocation...)
 	}
 
-	result := ResolveResult{}
+	stdout, stderr, err := runner.Run(ctx, opts.ProjectDir, gradleCmd, args...)
+	if err != nil {
+		return ResolveResult{}, &ExecError{
+			Err:         err,
+			Stdout:      stdout,
+			Stderr:      stderr,
+			Cmd:         gradleCmd,
+			Args:        args,
+			ProjectDir:  opts.ProjectDir,
+			ProjectPath: opts.ProjectPath,
+			Invocation:  invocation,
+		}
+	}
+
 	seen := make(map[string]struct{})
 	seenIncludes := make(map[string]struct{})
 	for _, line := range strings.Split(stdout, "\n") {
@@ -236,7 +277,7 @@ func samePath(a string, b string) bool {
 }
 
 func mergeResults(base ResolveResult, extra ResolveResult) ResolveResult {
-	if len(extra.Sources) == 0 && len(extra.Deps) == 0 && len(extra.IncludedBuilds) == 0 && len(extra.Warnings) == 0 {
+	if len(extra.Sources) == 0 && len(extra.Deps) == 0 && len(extra.IncludedBuilds) == 0 && len(extra.Warnings) == 0 && len(extra.Verbose) == 0 {
 		return base
 	}
 	seenSources := make(map[string]struct{}, len(base.Sources))
@@ -289,6 +330,19 @@ func mergeResults(base ResolveResult, extra ResolveResult) ResolveResult {
 			}
 			seenWarnings[warning] = struct{}{}
 			base.Warnings = append(base.Warnings, warning)
+		}
+	}
+	if len(extra.Verbose) > 0 {
+		seenVerbose := make(map[string]struct{}, len(base.Verbose))
+		for _, line := range base.Verbose {
+			seenVerbose[line] = struct{}{}
+		}
+		for _, line := range extra.Verbose {
+			if _, ok := seenVerbose[line]; ok {
+				continue
+			}
+			seenVerbose[line] = struct{}{}
+			base.Verbose = append(base.Verbose, line)
 		}
 	}
 	return base
@@ -349,6 +403,23 @@ func parseLine(line, prefix string) (resolve.Coord, string, bool) {
 		return coord, "", true
 	}
 	return coord, strings.TrimSpace(parts[1]), true
+}
+
+func formatGradleInvocation(cmd string, args []string, projectDir string, projectPath string) []string {
+	lines := make([]string, 0, 4)
+	lines = append(lines, fmt.Sprintf("Gradle exec: %s", cmd))
+	lines = append(lines, fmt.Sprintf("Gradle dir: %s", projectDir))
+	if projectPath == "" {
+		lines = append(lines, "Gradle projectPath: (root)")
+	} else {
+		lines = append(lines, fmt.Sprintf("Gradle projectPath: %s", projectPath))
+	}
+	if len(args) == 0 {
+		lines = append(lines, "Gradle args: (none)")
+	} else {
+		lines = append(lines, fmt.Sprintf("Gradle args: %s", strings.Join(args, " ")))
+	}
+	return lines
 }
 
 func findGradle(runner executil.Runner, projectDir string, rootDir string) (string, error) {

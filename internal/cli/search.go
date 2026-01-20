@@ -67,7 +67,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			emitWarnings(cmd, meta)
+			emitDiagnostics(cmd, meta, app.Verbose)
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
@@ -76,11 +76,22 @@ func newSearchCmd(app *App) *cobra.Command {
 				rgExtra = append(rgExtra, "-C", strconv.Itoa(contextLines))
 			}
 			rgExtra = append(rgExtra, passArgs...)
+			var report func(search.ExecPlan)
+			if app.Verbose {
+				report = func(plan search.ExecPlan) {
+					rgLine := fmt.Sprintf("rg: %s %s", plan.Cmd, formatRgArgs(plan))
+					emitVerbose(cmd, app.Verbose,
+						rgLine,
+						fmt.Sprintf("rg jars: %d (mode=%s)", plan.JarCount, plan.Mode),
+					)
+				}
+			}
 			matches, err := search.Run(ctx, app.Runner, search.Options{
 				Pattern: pattern,
 				Jars:    sources,
 				RGArgs:  rgExtra,
 				WorkDir: flags.Project,
+				Report:  report,
 			})
 			if err != nil {
 				return err
@@ -123,4 +134,14 @@ func hasSelector(flags ResolveFlags) bool {
 		strings.TrimSpace(flags.Group) != "" ||
 		strings.TrimSpace(flags.Artifact) != "" ||
 		strings.TrimSpace(flags.Version) != ""
+}
+
+func formatRgArgs(plan search.ExecPlan) string {
+	args := plan.Args
+	if plan.JarCount > 0 && len(args) >= plan.JarCount {
+		trimmed := append([]string{}, args[:len(args)-plan.JarCount]...)
+		trimmed = append(trimmed, fmt.Sprintf("<%d jars>", plan.JarCount))
+		return strings.Join(trimmed, " ")
+	}
+	return strings.Join(args, " ")
 }
