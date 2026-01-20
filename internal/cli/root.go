@@ -19,6 +19,8 @@ func NewRootCommand(app *App) *cobra.Command {
 	}
 
 	cmd.PersistentFlags().BoolVarP(&app.Verbose, "verbose", "v", false, "show verbose output (including Gradle failures)")
+	cmd.Version = versionString()
+	cmd.SetVersionTemplate("{{.Version}}\n")
 
 	cmd.AddCommand(newSearchCmd(app))
 	cmd.AddCommand(newCatCmd(app))

@@ -2,55 +2,54 @@ name: release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Tag version (e.g. v1.2.3)"
-        required: true
-  push:
-    tags:
-      - "v*.*.*"
+  pull_request:
+    types:
+      - closed
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'autorelease')) }}
     permissions:
       contents: write
     outputs:
-      tag: ${{ steps.resolve_tag.outputs.tag }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           check-latest: true
 
-      - name: Create tag (workflow dispatch)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Read version
+        id: version
+        run: |
+          version="$(tr -d ' \n' < VERSION)"
+          if [ -z "$version" ]; then
+            echo "VERSION file is empty" >&2
+            exit 1
+          fi
+          version="${version#v}"
+          tag="v${version}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
         env:
-          VERSION: ${{ inputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "$VERSION" >/dev/null 2>&1; then
-            echo "Tag $VERSION already exists"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists"
           else
-            git tag -a "$VERSION" -m "$VERSION"
-            git push origin "$VERSION"
-          fi
-
-      - name: Resolve tag
-        id: resolve_tag
-        env:
-          VERSION: ${{ inputs.version }}
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+            git tag -a "$TAG" -m "$TAG"
+            git push origin "$TAG"
           fi
 
       - name: Build changelog
@@ -62,7 +61,8 @@ jobs:
 
       - name: Build binaries
         env:
-          TAG: ${{ steps.resolve_tag.outputs.tag }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           mkdir -p dist
           for GOOS in darwin linux windows; do
@@ -74,7 +74,7 @@ jobs:
               fi
               out="ksrc_${TAG#v}_${GOOS}_${GOARCH}"
               env CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-                go build -o "dist/${out}${ext}" ./cmd/ksrc
+                go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${VERSION}" -o "dist/${out}${ext}" ./cmd/ksrc
               if [ "$GOOS" = "windows" ]; then
                 (cd dist && zip "${out}.zip" "${out}${ext}")
               else
@@ -87,8 +87,8 @@ jobs:
       - name: Create draft release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.resolve_tag.outputs.tag }}
-          name: ${{ steps.resolve_tag.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           draft: true
           body: ${{ steps.changelog.outputs.changelog }}
           files: dist/*

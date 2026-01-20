@@ -8,6 +8,7 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 
 ## Global Flags
 - `-v, --verbose`: Show verbose output (including Gradle failure output)
+- `--version`: Print version and exit
 
 ## Resolution Notes
 - If Gradle resolution fails, `ksrc` falls back to cache-only resolution and emits a warning.
