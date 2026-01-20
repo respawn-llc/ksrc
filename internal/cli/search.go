@@ -79,8 +79,9 @@ func newSearchCmd(app *App) *cobra.Command {
 			var report func(search.ExecPlan)
 			if app.Verbose {
 				report = func(plan search.ExecPlan) {
+					rgLine := fmt.Sprintf("rg: %s %s", plan.Cmd, formatRgArgs(plan))
 					emitVerbose(cmd, app.Verbose,
-						fmt.Sprintf("rg: %s %s", plan.Cmd, strings.Join(plan.Args, " ")),
+						rgLine,
 						fmt.Sprintf("rg jars: %d (mode=%s)", plan.JarCount, plan.Mode),
 					)
 				}
@@ -133,4 +134,14 @@ func hasSelector(flags ResolveFlags) bool {
 		strings.TrimSpace(flags.Group) != "" ||
 		strings.TrimSpace(flags.Artifact) != "" ||
 		strings.TrimSpace(flags.Version) != ""
+}
+
+func formatRgArgs(plan search.ExecPlan) string {
+	args := plan.Args
+	if plan.JarCount > 0 && len(args) >= plan.JarCount {
+		trimmed := append([]string{}, args[:len(args)-plan.JarCount]...)
+		trimmed = append(trimmed, fmt.Sprintf("<%d jars>", plan.JarCount))
+		return strings.Join(trimmed, " ")
+	}
+	return strings.Join(args, " ")
 }
