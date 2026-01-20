@@ -96,8 +96,6 @@ jobs:
   update_brew_tap:
     needs: release
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -117,4 +115,37 @@ jobs:
       - name: Update tap formula
         env:
           KSRC_VERSION: ${{ needs.release.outputs.tag }}
-        run: scripts/update-brew-tap.sh --tap "$GITHUB_WORKSPACE/homebrew-tap" --push
+        run: scripts/update-brew-tap.sh --tap "$GITHUB_WORKSPACE/homebrew-tap"
+
+      - name: Ensure pr-pull label exists
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
+          script: |
+            const owner = "respawn-app";
+            const repo = "homebrew-tap";
+            const name = "pr-pull";
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name,
+                color: "0e8a16",
+                description: "Ready for brew pr-pull",
+              });
+            }
+
+      - name: Create tap PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
+          path: homebrew-tap
+          base: master
+          branch: chore/ksrc-${{ needs.release.outputs.tag }}
+          commit-message: "ksrc ${{ needs.release.outputs.tag }}"
+          title: "ksrc ${{ needs.release.outputs.tag }}"
+          body: "Automated formula bump for ${{ needs.release.outputs.tag }}."
+          labels: pr-pull
