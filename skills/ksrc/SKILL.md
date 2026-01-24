@@ -5,16 +5,12 @@ description: Search/read 3rd-party Gradle (Kotlin/Java) dependency sources. Avoi
 
 ## How to use:
 
-Use `ksrc --version` to print the current CLI version.
-
 1. Search dependencies to retrieve coordinates and matches using rg-style globs: `ksrc search "class LocalDate\("`
 
 If you want faster execution & less noise, consider adding:
 - `--artifact` to limit search to one artifact, (or `--module` to also limit by version)
 - `--subproject` to help discovery for monorepos/large modular apps
 - `--targets` to limit to specific KMP targets. 
-- `--scope` for build-time deps (buildscript/tooling)
-- `--offline` for cache-only runs, `--refresh` to force downloads
 
 2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
@@ -22,7 +18,6 @@ File-id format: `group:artifact:version!/path/inside/jar.kt`
 
 ## Common issues
 - If, unexpectedly, no matches are found, try `--project` with app project (not monorepo root), specifying `--scope` (esp. for build-time deps), or `ksrc doctor`.
-- Composite builds: if no matches, run from the included build root or set `--project`.
 - `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
 - Gradle not found: a) run in a Gradle project dir, b) set `--project` path explicitly, c) install gradle on machine.
 - Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; re-run with `-v` to see Gradle output for debugging.
