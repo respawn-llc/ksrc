@@ -7,13 +7,19 @@ import (
 func NewRootCommand(app *App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ksrc",
-		Short: "Kotlin dependency source search",
-		Long: "Kotlin dependency source search.\n\n" +
-			"Common recipes:\n" +
-			"  Android: ksrc search \"symbol\" --config \"*debugCompileClasspath\" --module \"group:artifact\"\n" +
-			"  KMP:     ksrc search \"symbol\" --targets jvm --module \"group:artifact\"\n" +
-			"  JVM:     ksrc search \"symbol\" --scope compile --module \"group:artifact\"\n\n" +
-			"If E_NO_SOURCES: try --project <root>, --config \"*debugCompileClasspath\", or --subproject :module.",
+		Short: "Gradle dependency source search",
+		Long: "Gradle dependency source search CLI.\nStart by running `ksrc search` to locate snippets, rg-style, then run `ksrc cat` to read files using the returned file id.\n\n" +
+			"Guidance & caveats:\n" +
+			"  - Prefer --module/--artifact to reduce noise; use --subproject in monorepos.\n" +
+			"  - If no matches in composite builds, try running from the included build root or set --project.\n" +
+			"  - Use --scope for build-time deps; use --targets to limit KMP resolution.\n" +
+			"  - --offline uses cached sources only; --refresh forces downloads.\n\n" +
+			"Common issues:\n" +
+			"  - E_NO_SOURCES: try ksrc deps, ksrc fetch <coord>, or set --project/--scope.\n" +
+			"  - Gradle not found: run in a Gradle project or set --project to the root.\n" +
+			"  - Unsupported class version: fix Gradle <-> JDK mismatch (JAVA_HOME).\n\n" +
+			"File-id format:\n" +
+			"  group:artifact:version!/path/inside/jar.kt",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

@@ -8,6 +8,9 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 1 {
+		os.Args = append(os.Args, "--help")
+	}
 	app := cli.NewApp()
 	cmd := cli.NewRootCommand(app)
 	if err := cmd.Execute(); err != nil {

@@ -79,6 +79,43 @@ func TestResolveSourcesFallsBackToCacheOnGradleFailure(t *testing.T) {
 	}
 }
 
+func TestResolveSourcesCacheFallbackUsesVersionWhenProvided(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir: %v", err)
+	}
+	jar := filepath.Join(cacheDir, "demo-1.0.0-sources.jar")
+	if err := os.WriteFile(jar, []byte{}, 0o644); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	runner := &scriptedRunner{
+		results: []runResult{
+			{stdout: ""},
+		},
+	}
+	app := &App{Runner: runner}
+	flags := ResolveFlags{
+		Project: ".",
+		Module:  "com.example:demo:1.0.0",
+		Config:  "compileClasspath",
+	}
+	sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
+	if err != nil {
+		t.Fatalf("resolveSources error: %v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if len(meta.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got: %v", meta.Warnings)
+	}
+}
+
 func TestResolveSourcesAllKeepsMergedResultsOnGradleFailure(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
