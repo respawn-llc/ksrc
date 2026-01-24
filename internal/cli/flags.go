@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/respawn-app/ksrc/internal/gradle"
+	"github.com/respawn-app/ksrc/internal/resolution"
 )
 
 type ResolveFlags struct {
@@ -41,6 +42,29 @@ func (f ResolveFlags) ToOptions() gradle.ResolveOptions {
 		IncludeBuildSrc:       f.IncludeBuildSrc,
 		IncludeBuildscript:    f.IncludeBuildscript,
 		IncludeIncludedBuilds: f.IncludeIncludedBuilds,
+	}
+}
+
+func (f ResolveFlags) ToRequest(dep string, applyFilters bool, allowCacheFallback bool) resolution.Request {
+	return resolution.Request{
+		Project:               f.Project,
+		Module:                f.Module,
+		Group:                 f.Group,
+		Artifact:              f.Artifact,
+		Version:               f.Version,
+		Scope:                 f.Scope,
+		Config:                f.Config,
+		Targets:               f.Targets,
+		Subprojects:           f.Subprojects,
+		Offline:               f.Offline,
+		Refresh:               f.Refresh,
+		All:                   f.All,
+		IncludeBuildSrc:       f.IncludeBuildSrc,
+		IncludeBuildscript:    f.IncludeBuildscript,
+		IncludeIncludedBuilds: f.IncludeIncludedBuilds,
+		Dep:                   dep,
+		ApplyFilters:          applyFilters,
+		AllowCacheFallback:    allowCacheFallback,
 	}
 }
 

@@ -41,11 +41,9 @@ If no selector is provided, `ksrc` defaults to `--all`. Use `--module`/`--group`
 - `--refresh`: Re‑resolve and re‑download sources
 - `--offline`: Only use cached sources, error if missing
 - `--context <n>`: Show N lines before/after matches (rg `-C`)
-- `--max-results <n>`: Limit output
 - `--rg-args <args>`: Extra args passed to `rg` (comma‑separated)
 - `-- <rg-args>`: Pass through raw `rg` args without CSV encoding
 - `--show-extracted-path`: Include temp extracted paths in output (off by default)
-- `--emit-id <always|auto|never>`: Include file identifiers (default: `always`)
 
 **Output (default)**
 `<file-id> <line>:<col>:<match>` (use `--show-extracted-path` to include temp paths)
@@ -77,12 +75,12 @@ ksrc cat <file-id|path> [flags]
 
 ---
 
-### `ksrc open <path>`
+### `ksrc open <file-id|path>`
 Open a file in `$PAGER` (defaults to `less -R`).
 
 **Usage**
 ```
-ksrc open <path> [flags]
+ksrc open <file-id|path> [flags]
 ```
 
 **Flags**
@@ -149,7 +147,15 @@ ksrc where org/jetbrains/kotlinx/coroutines/flow/Flow.kt
 **Flags**
 - `--project <path>`
 - `--module <glob>` (disambiguate)
+- `--scope <compile|runtime|test|all>`
+- `--config <name>` (glob supported; comma‑separated)
+- `--targets <list>` (comma‑separated)
+- `--subproject <name>` (repeatable)
+- `--offline`
+- `--refresh`
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
+- `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
+- `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
 
 ---
 
@@ -174,6 +180,8 @@ ksrc resolve [flags]
 - `--offline`
 - `--refresh`
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
+- `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
+- `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
 
 ---
 

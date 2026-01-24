@@ -5,9 +5,11 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/respawn-app/ksrc/internal/executil"
 	"github.com/respawn-app/ksrc/internal/resolve"
 )
 
@@ -161,6 +163,33 @@ func TestResolveFallsBackToIncludedBuilds(t *testing.T) {
 	}
 }
 
+func TestResolveIncludedBuildsDedupesAndBfs(t *testing.T) {
+	root := t.TempDir()
+	buildA := filepath.Join(root, "buildA")
+	buildB := filepath.Join(root, "buildB")
+	buildC := filepath.Join(root, "buildC")
+
+	resolver := &stubResolver{
+		results: map[string]ResolveResult{
+			root:   {IncludedBuilds: []string{buildA, buildB, buildA}},
+			buildA: {IncludedBuilds: []string{buildB, buildC}},
+			buildB: {},
+			buildC: {},
+		},
+	}
+	opts := ResolveOptions{
+		ProjectDir:            root,
+		IncludeIncludedBuilds: true,
+	}
+	if _, err := resolveWith(context.Background(), fakeRunner{}, opts, resolver); err != nil {
+		t.Fatalf("resolveWith: %v", err)
+	}
+	expected := []string{root, buildA, buildB, buildC}
+	if !reflect.DeepEqual(resolver.calls, expected) {
+		t.Fatalf("expected call order %v, got %v", expected, resolver.calls)
+	}
+}
+
 type scriptedRunner struct {
 	responses map[string]runResult
 	calls     []string
@@ -189,4 +218,17 @@ func (r *scriptedRunner) Run(_ context.Context, dir string, _ string, args ...st
 
 func (r *scriptedRunner) LookPath(_ string) (string, error) {
 	return "gradle", nil
+}
+
+type stubResolver struct {
+	results map[string]ResolveResult
+	calls   []string
+}
+
+func (s *stubResolver) ResolveOnce(_ context.Context, _ executil.Runner, opts ResolveOptions) (ResolveResult, error) {
+	s.calls = append(s.calls, opts.ProjectDir)
+	if res, ok := s.results[opts.ProjectDir]; ok {
+		return res, nil
+	}
+	return ResolveResult{}, nil
 }
