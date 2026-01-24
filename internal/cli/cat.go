@@ -33,7 +33,7 @@ func newCatCmd(app *App) *cobra.Command {
 				flags.Module = coord.String()
 				flags.Version = coord.Version
 
-				sources, _, _, err := resolveSources(context.Background(), app, flags, "", true, false)
+				sources, _, _, err := resolveSources(context.Background(), app, flags, "", true, true)
 				if err != nil {
 					return err
 				}

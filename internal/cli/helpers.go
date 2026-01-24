@@ -125,11 +125,9 @@ func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep strin
 	}
 	if allowCacheFallback {
 		if coord, ok := resolve.SelectorToCoord(flags.Module, flags.Group, flags.Artifact, flags.Version); ok {
-			if coord.Version == "" {
-				cached, err := resolve.FindCachedSources(coord.Group, coord.Artifact, "")
-				if err == nil {
-					sources = cached
-				}
+			cached, err := resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+			if err == nil {
+				sources = cached
 			}
 		}
 	}
