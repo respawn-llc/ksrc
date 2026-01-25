@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/respawn-app/ksrc/internal/executil"
 	"github.com/respawn-app/ksrc/internal/resolve"
@@ -49,10 +50,8 @@ func Run(ctx context.Context, runner executil.Runner, opts Options) ([]Match, er
 		return nil, fmt.Errorf("rg not found on PATH")
 	}
 
-	if supportsZipSearch(ctx, runner) {
-		return runZipSearch(ctx, runner, opts)
-	}
-	return runExtractSearch(ctx, runner, opts)
+	strategy := selectStrategy(ctx, runner)
+	return strategy.run(ctx, runner, opts)
 }
 
 func parseRgLine(line string) (Match, bool) {
@@ -111,6 +110,29 @@ func parseRgContextLine(line string) (Match, bool) {
 	return Match{File: file, Line: ln, Column: 0, Text: text}, true
 }
 
+type coordMapper func(string) (resolve.Coord, string, bool)
+
+func parseRgOutput(stdout string, mapper coordMapper) []Match {
+	matches := []Match{}
+	for _, line := range strings.Split(stdout, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		m, ok := parseRgLine(line)
+		if !ok {
+			continue
+		}
+		coord, inner, ok := mapper(m.File)
+		if !ok {
+			continue
+		}
+		m.FileID = coord.String() + "!/" + inner
+		matches = append(matches, m)
+	}
+	return matches
+}
+
 func mapToCoord(roots map[string]resolve.Coord, filePath string) (resolve.Coord, string, bool) {
 	for root, coord := range roots {
 		rel, err := filepath.Rel(root, filePath)
@@ -134,6 +156,18 @@ func mapToCoordFromJarPath(jarPaths map[string]resolve.Coord, filePath string) (
 		return coord, inner, true
 	}
 	return resolve.Coord{}, "", false
+}
+
+type searchStrategy struct {
+	mode string
+	run  func(context.Context, executil.Runner, Options) ([]Match, error)
+}
+
+func selectStrategy(ctx context.Context, runner executil.Runner) searchStrategy {
+	if supportsZipSearch(ctx, runner) {
+		return searchStrategy{mode: "zip", run: runZipSearch}
+	}
+	return searchStrategy{mode: "extract", run: runExtractSearch}
 }
 
 func runZipSearch(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
@@ -169,24 +203,9 @@ func runZipSearch(ctx context.Context, runner executil.Runner, opts Options) ([]
 		}
 	}
 
-	matches := []Match{}
-	for _, line := range strings.Split(stdout, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		m, ok := parseRgLine(line)
-		if !ok {
-			continue
-		}
-		coord, inner, ok := mapToCoordFromJarPath(jarPaths, m.File)
-		if !ok {
-			continue
-		}
-		m.FileID = coord.String() + "!/" + inner
-		matches = append(matches, m)
-	}
-	return matches, nil
+	return parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
+		return mapToCoordFromJarPath(jarPaths, filePath)
+	}), nil
 }
 
 func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
@@ -232,24 +251,9 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 		}
 	}
 
-	matches := []Match{}
-	for _, line := range strings.Split(stdout, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		m, ok := parseRgLine(line)
-		if !ok {
-			continue
-		}
-		coord, inner, ok := mapToCoord(extractRoots, m.File)
-		if !ok {
-			continue
-		}
-		m.FileID = coord.String() + "!/" + inner
-		matches = append(matches, m)
-	}
-	return matches, nil
+	return parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
+		return mapToCoord(extractRoots, filePath)
+	}), nil
 }
 
 type exitCoder interface {
@@ -266,7 +270,29 @@ func isNoMatches(err error) bool {
 	return false
 }
 
+var zipSupport = &zipSupportCache{}
+
+type zipSupportCache struct {
+	once      sync.Once
+	supported bool
+}
+
+func (c *zipSupportCache) supports(ctx context.Context, runner executil.Runner) bool {
+	c.once.Do(func() {
+		c.supported = probeZipSearch(ctx, runner)
+	})
+	return c.supported
+}
+
 func supportsZipSearch(ctx context.Context, runner executil.Runner) bool {
+	return zipSupport.supports(ctx, runner)
+}
+
+func resetZipSupportCacheForTests() {
+	zipSupport = &zipSupportCache{}
+}
+
+func probeZipSearch(ctx context.Context, runner executil.Runner) bool {
 	file, err := os.CreateTemp("", "ksrc-rg-probe-*.zip")
 	if err != nil {
 		return false

@@ -32,6 +32,7 @@ func TestParseRgContextLine(t *testing.T) {
 }
 
 func TestRunUsesZipSearchWhenSupported(t *testing.T) {
+	resetZipSupportCacheForTests()
 	jarPath := filepath.Join(t.TempDir(), "foo.jar")
 	coord := resolve.Coord{Group: "com.example", Artifact: "foo", Version: "1.0.0"}
 	runner := &fakeRunner{jarPath: jarPath}
@@ -56,6 +57,7 @@ func TestRunUsesZipSearchWhenSupported(t *testing.T) {
 }
 
 func TestRunTreatsExitCodeOneAsNoMatches(t *testing.T) {
+	resetZipSupportCacheForTests()
 	jarPath := filepath.Join(t.TempDir(), "foo.jar")
 	coord := resolve.Coord{Group: "com.example", Artifact: "foo", Version: "1.0.0"}
 	runner := &exitCodeRunner{jarPath: jarPath, exitCode: 1}
@@ -70,6 +72,22 @@ func TestRunTreatsExitCodeOneAsNoMatches(t *testing.T) {
 	}
 	if len(matches) != 0 {
 		t.Fatalf("expected no matches, got %d", len(matches))
+	}
+}
+
+func TestParseRgOutputMapsFileIDs(t *testing.T) {
+	coord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
+	stdout := "/tmp/root/demo.kt:7:2:match\n"
+	roots := map[string]resolve.Coord{"/tmp/root": coord}
+
+	matches := parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
+		return mapToCoord(roots, filePath)
+	})
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches[0].FileID != "com.example:demo:1.0.0!/demo.kt" {
+		t.Fatalf("unexpected file-id: %s", matches[0].FileID)
 	}
 }
 

@@ -55,3 +55,8 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 
 ## Performance Notes
 - Each resolution stage starts Gradle and can be slow.
+
+## 2026-01-24: Resolution orchestration split
+- CLI delegates resolution to `internal/resolution` to keep command wiring thin.
+- Gradle traversal is separated from invocation/parsing with an injectable resolver for tests.
+- Search strategy selection is separated from rg output parsing; zip capability is cached per process.
