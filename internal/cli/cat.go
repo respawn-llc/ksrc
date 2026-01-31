@@ -91,7 +91,7 @@ func newCatCmd(app *App) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.IncludeBuildSrc, "buildsrc", true, "include buildSrc dependencies (set --buildsrc=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeBuildscript, "buildscript", true, "include buildscript classpath dependencies (set --buildscript=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeIncludedBuilds, "include-builds", true, "include composite builds (includeBuild) (set --include-builds=false to disable)")
-	cmd.Flags().StringVar(&lines, "lines", "", "line range (start,end)")
+	cmd.Flags().StringVar(&lines, "lines", "", "line range (start,end | start:end | start-end | start..end | start;end)")
 
 	return cmd
 }

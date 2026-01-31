@@ -8,14 +8,28 @@ import (
 )
 
 func TestParseLineRange(t *testing.T) {
-	lr, err := ParseLineRange("1,3")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	cases := []struct {
+		in    string
+		start int
+		end   int
+	}{
+		{"1,3", 1, 3},
+		{"1:3", 1, 3},
+		{"1-3", 1, 3},
+		{"1 3", 1, 3},
+		{"1..3", 1, 3},
+		{"1;3", 1, 3},
 	}
-	if lr.Start != 1 || lr.End != 3 {
-		t.Fatalf("unexpected range: %+v", lr)
+	for _, tc := range cases {
+		lr, err := ParseLineRange(tc.in)
+		if err != nil {
+			t.Fatalf("unexpected error for %q: %v", tc.in, err)
+		}
+		if lr.Start != tc.start || lr.End != tc.end {
+			t.Fatalf("unexpected range for %q: %+v", tc.in, lr)
+		}
 	}
-	if _, err := ParseLineRange("1:3"); err == nil {
+	if _, err := ParseLineRange("1 3 4"); err == nil {
 		t.Fatal("expected error for invalid range")
 	}
 }

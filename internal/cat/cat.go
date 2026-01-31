@@ -19,7 +19,7 @@ func ParseLineRange(value string) (*LineRange, error) {
 	if value == "" {
 		return nil, nil
 	}
-	parts := strings.Split(value, ",")
+	parts := splitLineRange(value)
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid line range: %q", value)
 	}
@@ -35,6 +35,11 @@ func ParseLineRange(value string) (*LineRange, error) {
 		return nil, fmt.Errorf("invalid line range: %q", value)
 	}
 	return &LineRange{Start: start, End: end}, nil
+}
+
+func splitLineRange(value string) []string {
+	replacer := strings.NewReplacer(",", " ", ":", " ", "-", " ", ";", " ", "..", " ")
+	return strings.Fields(replacer.Replace(value))
 }
 
 func parsePositive(s string) (int, error) {
