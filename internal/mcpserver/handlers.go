@@ -532,7 +532,7 @@ func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, e
 			return src.Path, nil
 		}
 	}
-	return "", fmt.Errorf("source jar not found for %s. Try: calling `fetch() tool, or if you don't see it, ask the user to enable with `ksrc mcp --tools=all`. %s", coord.String(), coord.String())
+	return "", fmt.Errorf("source jar not found for %s. Try: calling `fetch` tool, or if you don't see it, ask the user to enable with `ksrc mcp --tools=all`", coord.String())
 }
 
 func findFileInJars(sources []resolve.SourceJar, inner string) (string, resolve.Coord, string, error) {
