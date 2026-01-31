@@ -57,6 +57,23 @@ Install from the public GitHub path:
 $skill-installer install https://github.com/respawn-app/ksrc/tree/main/skills/ksrc
 ```
 
+### MCP (Model Context Protocol)
+
+Configure your MCP client to spawn the stdio server:
+
+```json
+{
+  "mcpServers": {
+    "ksrc": {
+      "command": "ksrc",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Default tools: `search`, `cat`, `deps`. Enable more via `--tools=<list>` (e.g., `--tools=search,cat,deps,resolve` or `--tools=all`).
+
 ### AGENTS.md prompt
 
 > Use `ksrc` bash command to discover Kotlin/gradle library dependency sources. Start with `ksrc --help`.

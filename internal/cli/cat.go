@@ -108,8 +108,7 @@ func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, e
 func findFileInJars(sources []resolve.SourceJar, inner string) (string, string, error) {
 	inner = strings.TrimPrefix(inner, "/")
 	for _, s := range sources {
-		data, err := cat.ReadFileFromZip(s.Path, inner, nil)
-		if err == nil && len(data) > 0 {
+		if _, err := cat.ReadFileFromZip(s.Path, inner, nil); err == nil {
 			return s.Path, inner, nil
 		}
 	}
