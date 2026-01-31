@@ -2,10 +2,12 @@ package mcpserver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/respawn-app/ksrc/internal/cat"
 	"github.com/respawn-app/ksrc/internal/executil"
@@ -21,39 +23,45 @@ type toolState struct {
 
 func registerTools(server *mcp.Server, state *toolState, tools ToolSet) {
 	if tools.Enabled(ToolSearch) {
-		mcp.AddTool(server, &mcp.Tool{
+		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolSearch),
 			Description: "Search dependency sources for a pattern",
+			InputSchema: mustInputSchema[SearchInput](),
 		}, state.handleSearch)
 	}
 	if tools.Enabled(ToolCat) {
-		mcp.AddTool(server, &mcp.Tool{
+		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolCat),
 			Description: "Read a file by file-id",
+			InputSchema: mustInputSchema[CatInput](),
 		}, state.handleCat)
 	}
 	if tools.Enabled(ToolDeps) {
-		mcp.AddTool(server, &mcp.Tool{
+		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolDeps),
 			Description: "List resolved dependencies and source availability",
+			InputSchema: mustInputSchema[DepsInput](),
 		}, state.handleDeps)
 	}
 	if tools.Enabled(ToolFetch) {
-		mcp.AddTool(server, &mcp.Tool{
+		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolFetch),
 			Description: "Ensure sources for a coordinate exist in Gradle caches",
+			InputSchema: mustInputSchema[FetchInput](),
 		}, state.handleFetch)
 	}
 	if tools.Enabled(ToolResolve) {
-		mcp.AddTool(server, &mcp.Tool{
+		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolResolve),
 			Description: "Resolve dependency sources",
+			InputSchema: mustInputSchema[ResolveInput](),
 		}, state.handleResolve)
 	}
 	if tools.Enabled(ToolWhere) {
-		mcp.AddTool(server, &mcp.Tool{
+		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolWhere),
 			Description: "Locate cached source artifact or file",
+			InputSchema: mustInputSchema[WhereInput](),
 		}, state.handleWhere)
 	}
 }
@@ -134,12 +142,16 @@ type WhereInput struct {
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty"`
 }
 
-func (s *toolState) handleSearch(ctx context.Context, _ *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, struct{}, error) {
+func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	input, err := decodeInput[SearchInput](call)
+	if err != nil {
+		return nil, err
+	}
 	query := strings.TrimSpace(input.Query)
 	if query == "" {
-		return nil, struct{}{}, fmt.Errorf("query is required")
+		return toolError(fmt.Errorf("query is required")), nil
 	}
-	req := resolution.Request{
+	resReq := resolution.Request{
 		Project:               withDefaultString(input.Project, "."),
 		Group:                 strings.TrimSpace(input.Group),
 		Artifact:              strings.TrimSpace(input.Artifact),
@@ -155,16 +167,16 @@ func (s *toolState) handleSearch(ctx context.Context, _ *mcp.CallToolRequest, in
 		AllowCacheFallback:    true,
 	}
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-	result, err := service.ResolveSources(ctx, req)
+	result, err := service.ResolveSources(ctx, resReq)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	emitDiagnostics(result.Meta, s.verbose)
 	if len(result.Sources) == 0 {
-		return nil, struct{}{}, noSourcesError(req.Group, req.Artifact, req.Version)
+		return toolError(noSourcesError(resReq.Group, resReq.Artifact, resReq.Version)), nil
 	}
 	if _, err := s.runner.LookPath("rg"); err != nil {
-		return nil, struct{}{}, fmt.Errorf("rg not found on PATH")
+		return toolError(fmt.Errorf("rg not found on PATH")), nil
 	}
 
 	rgArgs := cleanList(input.RgArgs)
@@ -185,35 +197,39 @@ func (s *toolState) handleSearch(ctx context.Context, _ *mcp.CallToolRequest, in
 		Pattern: query,
 		Jars:    result.Sources,
 		RGArgs:  rgArgs,
-		WorkDir: req.Project,
+		WorkDir: resReq.Project,
 		Report:  report,
 	})
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	if len(matches) == 0 {
-		return textResult("no results"), struct{}{}, nil
+		return textResult("no results"), nil
 	}
 
 	var sb strings.Builder
 	for _, m := range matches {
 		fmt.Fprintf(&sb, "%s %d:%d:%s\n", m.FileID, m.Line, m.Column, m.Text)
 	}
-	return textResult(sb.String()), struct{}{}, nil
+	return textResult(sb.String()), nil
 }
 
-func (s *toolState) handleCat(ctx context.Context, _ *mcp.CallToolRequest, input CatInput) (*mcp.CallToolResult, struct{}, error) {
+func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	input, err := decodeInput[CatInput](call)
+	if err != nil {
+		return nil, err
+	}
 	fileID := strings.TrimSpace(input.FileID)
 	if fileID == "" {
-		return nil, struct{}{}, fmt.Errorf("fileId is required")
+		return toolError(fmt.Errorf("fileId is required")), nil
 	}
 	coord, inner, err := resolve.ParseFileID(fileID)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	lr, err := cat.ParseLineRange(input.Lines)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 
 	req := resolution.Request{
@@ -231,24 +247,28 @@ func (s *toolState) handleCat(ctx context.Context, _ *mcp.CallToolRequest, input
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
 	result, err := service.ResolveSources(ctx, req)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	if len(result.Sources) == 0 {
-		return nil, struct{}{}, noSourcesError(coord.Group, coord.Artifact, coord.Version)
+		return toolError(noSourcesError(coord.Group, coord.Artifact, coord.Version)), nil
 	}
 	jarPath, err := findJarByCoord(result.Sources, coord)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	data, err := cat.ReadFileFromZip(jarPath, inner, lr)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
-	return textResult(string(data)), struct{}{}, nil
+	return textResult(string(data)), nil
 }
 
-func (s *toolState) handleDeps(ctx context.Context, _ *mcp.CallToolRequest, input DepsInput) (*mcp.CallToolResult, struct{}, error) {
-	req := resolution.Request{
+func (s *toolState) handleDeps(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	input, err := decodeInput[DepsInput](call)
+	if err != nil {
+		return nil, err
+	}
+	resReq := resolution.Request{
 		Project:               withDefaultString(input.Project, "."),
 		Scope:                 withDefaultString(input.Scope, "compile"),
 		Config:                joinCSV(input.Config),
@@ -261,9 +281,9 @@ func (s *toolState) handleDeps(ctx context.Context, _ *mcp.CallToolRequest, inpu
 		AllowCacheFallback:    false,
 	}
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-	result, err := service.ResolveSources(ctx, req)
+	result, err := service.ResolveSources(ctx, resReq)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	emitDiagnostics(result.Meta, s.verbose)
 
@@ -272,18 +292,22 @@ func (s *toolState) handleDeps(ctx context.Context, _ *mcp.CallToolRequest, inpu
 
 	var sb strings.Builder
 	writeDepsOutput(&sb, filteredSources, filteredDeps)
-	return textResult(sb.String()), struct{}{}, nil
+	return textResult(sb.String()), nil
 }
 
-func (s *toolState) handleFetch(ctx context.Context, _ *mcp.CallToolRequest, input FetchInput) (*mcp.CallToolResult, struct{}, error) {
+func (s *toolState) handleFetch(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	input, err := decodeInput[FetchInput](call)
+	if err != nil {
+		return nil, err
+	}
 	group := strings.TrimSpace(input.Group)
 	artifact := strings.TrimSpace(input.Artifact)
 	version := strings.TrimSpace(input.Version)
 	if group == "" || artifact == "" || version == "" {
-		return nil, struct{}{}, fmt.Errorf("group, artifact, and version are required")
+		return toolError(fmt.Errorf("group, artifact, and version are required")), nil
 	}
 	coord := resolve.Coord{Group: group, Artifact: artifact, Version: version}
-	req := resolution.Request{
+	resReq := resolution.Request{
 		Project:               withDefaultString(input.Project, "."),
 		Group:                 group,
 		Artifact:              artifact,
@@ -297,13 +321,13 @@ func (s *toolState) handleFetch(ctx context.Context, _ *mcp.CallToolRequest, inp
 		AllowCacheFallback:    false,
 	}
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-	result, err := service.ResolveSources(ctx, req)
+	result, err := service.ResolveSources(ctx, resReq)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	emitDiagnostics(result.Meta, s.verbose)
 	if len(result.Sources) == 0 {
-		return nil, struct{}{}, noSourcesError(group, artifact, version)
+		return toolError(noSourcesError(group, artifact, version)), nil
 	}
 	var sb strings.Builder
 	for _, src := range result.Sources {
@@ -311,11 +335,15 @@ func (s *toolState) handleFetch(ctx context.Context, _ *mcp.CallToolRequest, inp
 			fmt.Fprintf(&sb, "%s|%s\n", src.Coord.String(), src.Path)
 		}
 	}
-	return textResult(sb.String()), struct{}{}, nil
+	return textResult(sb.String()), nil
 }
 
-func (s *toolState) handleResolve(ctx context.Context, _ *mcp.CallToolRequest, input ResolveInput) (*mcp.CallToolResult, struct{}, error) {
-	req := resolution.Request{
+func (s *toolState) handleResolve(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	input, err := decodeInput[ResolveInput](call)
+	if err != nil {
+		return nil, err
+	}
+	resReq := resolution.Request{
 		Project:               withDefaultString(input.Project, "."),
 		Group:                 strings.TrimSpace(input.Group),
 		Artifact:              strings.TrimSpace(input.Artifact),
@@ -330,36 +358,40 @@ func (s *toolState) handleResolve(ctx context.Context, _ *mcp.CallToolRequest, i
 		ApplyFilters:          true,
 		AllowCacheFallback:    true,
 	}
-	if req.Group == "" && req.Artifact == "" && req.Version == "" {
-		req.All = true
+	if resReq.Group == "" && resReq.Artifact == "" && resReq.Version == "" {
+		resReq.All = true
 	}
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-	result, err := service.ResolveSources(ctx, req)
+	result, err := service.ResolveSources(ctx, resReq)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	emitDiagnostics(result.Meta, s.verbose)
 	if len(result.Sources) == 0 {
-		return nil, struct{}{}, noSourcesError(req.Group, req.Artifact, req.Version)
+		return toolError(noSourcesError(resReq.Group, resReq.Artifact, resReq.Version)), nil
 	}
 	var sb strings.Builder
 	for _, src := range result.Sources {
 		fmt.Fprintf(&sb, "%s|%s\n", src.Coord.String(), src.Path)
 	}
-	return textResult(sb.String()), struct{}{}, nil
+	return textResult(sb.String()), nil
 }
 
-func (s *toolState) handleWhere(ctx context.Context, _ *mcp.CallToolRequest, input WhereInput) (*mcp.CallToolResult, struct{}, error) {
+func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	input, err := decodeInput[WhereInput](call)
+	if err != nil {
+		return nil, err
+	}
 	arg := strings.TrimSpace(input.PathOrCoord)
 	if arg == "" {
-		return nil, struct{}{}, fmt.Errorf("pathOrCoord is required")
+		return toolError(fmt.Errorf("pathOrCoord is required")), nil
 	}
 	if strings.Contains(arg, "!/") {
 		coord, inner, err := resolve.ParseFileID(arg)
 		if err != nil {
-			return nil, struct{}{}, err
+			return toolError(err), nil
 		}
-		req := resolution.Request{
+		resReq := resolution.Request{
 			Project:               withDefaultString(input.Project, "."),
 			Group:                 coord.Group,
 			Artifact:              coord.Artifact,
@@ -376,25 +408,25 @@ func (s *toolState) handleWhere(ctx context.Context, _ *mcp.CallToolRequest, inp
 			AllowCacheFallback:    true,
 		}
 		service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-		result, err := service.ResolveSources(ctx, req)
+		result, err := service.ResolveSources(ctx, resReq)
 		if err != nil {
-			return nil, struct{}{}, err
+			return toolError(err), nil
 		}
 		if len(result.Sources) == 0 {
-			return nil, struct{}{}, noSourcesError(coord.Group, coord.Artifact, coord.Version)
+			return toolError(noSourcesError(coord.Group, coord.Artifact, coord.Version)), nil
 		}
 		jarPath, err := findJarByCoord(result.Sources, coord)
 		if err != nil {
-			return nil, struct{}{}, err
+			return toolError(err), nil
 		}
-		return textResult(fmt.Sprintf("%s|%s\n", coord.String()+"!/"+inner, jarPath)), struct{}{}, nil
+		return textResult(fmt.Sprintf("%s|%s\n", coord.String()+"!/"+inner, jarPath)), nil
 	}
 	if coord, err := resolve.ParseCoord(arg); err == nil {
 		dep := ""
 		if coord.Version != "" {
 			dep = coord.String()
 		}
-		req := resolution.Request{
+		resReq := resolution.Request{
 			Project:               withDefaultString(input.Project, "."),
 			Group:                 coord.Group,
 			Artifact:              coord.Artifact,
@@ -411,29 +443,29 @@ func (s *toolState) handleWhere(ctx context.Context, _ *mcp.CallToolRequest, inp
 			AllowCacheFallback:    true,
 		}
 		service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-		result, err := service.ResolveSources(ctx, req)
+		result, err := service.ResolveSources(ctx, resReq)
 		if err != nil {
-			return nil, struct{}{}, err
+			return toolError(err), nil
 		}
 		emitDiagnostics(result.Meta, s.verbose)
 		if len(result.Sources) == 0 {
-			return nil, struct{}{}, noSourcesError(coord.Group, coord.Artifact, coord.Version)
+			return toolError(noSourcesError(coord.Group, coord.Artifact, coord.Version)), nil
 		}
 		jarPath, err := findJarByCoord(result.Sources, coord)
 		if err != nil {
-			return nil, struct{}{}, err
+			return toolError(err), nil
 		}
-		return textResult(fmt.Sprintf("%s|%s\n", coord.String(), jarPath)), struct{}{}, nil
+		return textResult(fmt.Sprintf("%s|%s\n", coord.String(), jarPath)), nil
 	}
 
 	group := strings.TrimSpace(input.Group)
 	artifact := strings.TrimSpace(input.Artifact)
 	version := strings.TrimSpace(input.Version)
 	if group == "" || artifact == "" {
-		return nil, struct{}{}, fmt.Errorf("path requires group and artifact filters or a file-id")
+		return toolError(fmt.Errorf("path requires group and artifact filters or a file-id")), nil
 	}
 	path := strings.TrimPrefix(arg, "/")
-	req := resolution.Request{
+	resReq := resolution.Request{
 		Project:               withDefaultString(input.Project, "."),
 		Group:                 group,
 		Artifact:              artifact,
@@ -449,23 +481,49 @@ func (s *toolState) handleWhere(ctx context.Context, _ *mcp.CallToolRequest, inp
 		AllowCacheFallback:    true,
 	}
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
-	result, err := service.ResolveSources(ctx, req)
+	result, err := service.ResolveSources(ctx, resReq)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
 	emitDiagnostics(result.Meta, s.verbose)
 	if len(result.Sources) == 0 {
-		return nil, struct{}{}, noSourcesError(group, artifact, version)
+		return toolError(noSourcesError(group, artifact, version)), nil
 	}
 	jarPath, coord, inner, err := findFileInJars(result.Sources, path)
 	if err != nil {
-		return nil, struct{}{}, err
+		return toolError(err), nil
 	}
-	return textResult(fmt.Sprintf("%s|%s\n", coord.String()+"!/"+inner, jarPath)), struct{}{}, nil
+	return textResult(fmt.Sprintf("%s|%s\n", coord.String()+"!/"+inner, jarPath)), nil
 }
 
 func textResult(text string) *mcp.CallToolResult {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}
+}
+
+func toolError(err error) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		IsError: true,
+		Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}},
+	}
+}
+
+func decodeInput[T any](req *mcp.CallToolRequest) (T, error) {
+	var input T
+	if req == nil || req.Params.Arguments == nil {
+		return input, nil
+	}
+	if err := json.Unmarshal(req.Params.Arguments, &input); err != nil {
+		return input, err
+	}
+	return input, nil
+}
+
+func mustInputSchema[T any]() *jsonschema.Schema {
+	schema, err := jsonschema.For[T](nil)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, error) {
