@@ -33,6 +33,7 @@
 - Resolution changes: keep init script minimal and compatible with multiple Gradle versions.
 - Search changes: must keep `rg` call scoped to resolved JARs only.
 - After code changes, rebuild the binary to `./bin/ksrc` so the symlinked CLI updates for the user.
+- Brew manipulation: The brew tap with the ksrc formulat is separate repo at https://github.com/respawn-app/homebrew-tap . It's usually cloned at the parent dir of the cwd (./../homebrew-tap/)
 
 ## Tests
 - Unit: parsing, version selection, file‑id handling.
@@ -40,5 +41,5 @@
 
 ## Clean Merge Expectations
 - Keep changes focused;
-- Update ./docs and ./skills when CLI flags or output formats change.
+- Update ./docs and ./skills when CLI flags, outputs, APIs or formats change.
 - Update AGENTS.md (this file) with learnings/rules/memories for future you.

@@ -124,6 +124,8 @@ fi
 
 perl -0pi -e "s|^  url \".*\"|  url \"$url\"|m" "$formula_path"
 perl -0pi -e "s|^  sha256 \".*\"|  sha256 \"$sha256\"|m" "$formula_path"
+# Drop stale bottle blocks; brew pr-pull will regenerate correct bottles.
+perl -0pi -e 's/^\s*bottle do\n(?:.*\n)*?\s*end\n\n//m' "$formula_path"
 
 if [[ "$do_commit" == "true" ]]; then
   git -C "$tap_dir" add "$formula_path"
