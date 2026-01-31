@@ -514,7 +514,7 @@ func toolError(err error) *mcp.CallToolResult {
 
 func decodeInput[T any](req *mcp.CallToolRequest) (T, error) {
 	var input T
-	if req == nil || req.Params.Arguments == nil {
+	if req == nil || req.Params == nil || req.Params.Arguments == nil {
 		return input, nil
 	}
 	if err := json.Unmarshal(req.Params.Arguments, &input); err != nil {
