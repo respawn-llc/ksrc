@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
 
@@ -19,15 +20,15 @@ func ParseLineRange(value string) (*LineRange, error) {
 	if value == "" {
 		return nil, nil
 	}
-	parts := splitLineRange(value)
-	if len(parts) != 2 {
+	matches := lineRangeRe.FindStringSubmatch(value)
+	if matches == nil {
 		return nil, fmt.Errorf("invalid line range: %q", value)
 	}
-	start, err := parsePositive(parts[0])
+	start, err := parsePositive(matches[1])
 	if err != nil {
 		return nil, err
 	}
-	end, err := parsePositive(parts[1])
+	end, err := parsePositive(matches[2])
 	if err != nil {
 		return nil, err
 	}
@@ -35,11 +36,6 @@ func ParseLineRange(value string) (*LineRange, error) {
 		return nil, fmt.Errorf("invalid line range: %q", value)
 	}
 	return &LineRange{Start: start, End: end}, nil
-}
-
-func splitLineRange(value string) []string {
-	replacer := strings.NewReplacer(",", " ", ":", " ", "-", " ", ";", " ", "..", " ")
-	return strings.Fields(replacer.Replace(value))
 }
 
 func parsePositive(s string) (int, error) {
@@ -50,6 +46,8 @@ func parsePositive(s string) (int, error) {
 	}
 	return n, nil
 }
+
+var lineRangeRe = regexp.MustCompile(`^\s*(\d+)\s*(?:,|:|-|\.{2}|;|\s)\s*(\d+)\s*$`)
 
 // ReadFileFromZip reads a file from a zip/jar and optionally slices by line range.
 func ReadFileFromZip(zipPath, innerPath string, lr *LineRange) ([]byte, error) {
