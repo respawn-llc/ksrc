@@ -91,7 +91,7 @@ func newCatCmd(app *App) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.IncludeBuildSrc, "buildsrc", true, "include buildSrc dependencies (set --buildsrc=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeBuildscript, "buildscript", true, "include buildscript classpath dependencies (set --buildscript=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeIncludedBuilds, "include-builds", true, "include composite builds (includeBuild) (set --include-builds=false to disable)")
-	cmd.Flags().StringVar(&lines, "lines", "", "line range (start,end)")
+	cmd.Flags().StringVar(&lines, "lines", "", "line range (start,end | start:end | start-end | start..end | start;end)")
 
 	return cmd
 }
@@ -108,8 +108,7 @@ func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, e
 func findFileInJars(sources []resolve.SourceJar, inner string) (string, string, error) {
 	inner = strings.TrimPrefix(inner, "/")
 	for _, s := range sources {
-		data, err := cat.ReadFileFromZip(s.Path, inner, nil)
-		if err == nil && len(data) > 0 {
+		if _, err := cat.ReadFileFromZip(s.Path, inner, nil); err == nil {
 			return s.Path, inner, nil
 		}
 	}

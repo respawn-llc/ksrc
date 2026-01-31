@@ -34,6 +34,7 @@
 - Search changes: must keep `rg` call scoped to resolved JARs only.
 - After code changes, rebuild the binary to `./bin/ksrc` so the symlinked CLI updates for the user.
 - Brew manipulation: The brew tap with the ksrc formulat is separate repo at https://github.com/respawn-app/homebrew-tap . It's usually cloned at the parent dir of the cwd (./../homebrew-tap/)
+- MCP server: `ksrc mcp` (stdio). Default tools: `search`, `cat`, `deps`. Enable extras via `--tools=<list>` or `--tools=all`.
 
 ## Tests
 - Unit: parsing, version selection, file‑id handling.
@@ -42,4 +43,5 @@
 ## Clean Merge Expectations
 - Keep changes focused;
 - Update ./docs and ./skills when CLI flags, outputs, APIs or formats change.
+- Release process: see ./docs/release-workflow.md
 - Update AGENTS.md (this file) with learnings/rules/memories for future you.

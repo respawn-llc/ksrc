@@ -57,9 +57,28 @@ Install from the public GitHub path:
 $skill-installer install https://github.com/respawn-app/ksrc/tree/main/skills/ksrc
 ```
 
+### MCP (Model Context Protocol)
+
+Use when your agent doesn't have `bash` tool. Configure your MCP client to spawn the stdio server:
+
+```json
+{
+  "mcpServers": {
+    "ksrc": {
+      "command": "ksrc",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Default tools: `search`, `cat`, `deps`. Enable more via `--tools=<list>` (e.g., `--tools=search,cat,deps,resolve` or `--tools=all`).
+
+You shouldn't need the skill if you use mcp, but if your agent has access to `bash` tool, prefer CLI+bash instead of the mcp.
+
 ### AGENTS.md prompt
 
-> Use `ksrc` bash command to discover Kotlin/gradle library dependency sources. Start with `ksrc --help`.
+> Avoid directly accessing `.gradle`; instead, proactively use `ksrc` bash tool to inspect source code of dependencies to learn API shapes or implementations. Start with `ksrc --help`.
 
 ## Usage
 

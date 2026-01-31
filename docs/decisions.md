@@ -60,3 +60,8 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - CLI delegates resolution to `internal/resolution` to keep command wiring thin.
 - Gradle traversal is separated from invocation/parsing with an injectable resolver for tests.
 - Search strategy selection is separated from rg output parsing; zip capability is cached per process.
+
+## 2026-01-31: MCP tools return plaintext only (no structuredContent)
+- Problem: some MCP harnesses (e.g. Codex) prefer `structuredContent` over `content`. The Go SDK auto-populates `structuredContent` for typed handlers (`ToolHandlerFor`), and when the output type was `struct{}`, it serialized to `{}`. That caused harnesses to ignore the real plaintext output in `content`.
+- Decision: switch MCP tools to untyped handlers (`ToolHandler`) and supply explicit `InputSchema` to keep validation while ensuring we only emit `content` text. Errors are returned as `IsError=true` with a text payload in `content`.
+- Tradeoff: we lose auto-generated output schemas/structured output, but avoid empty `{}` structured payloads and keep cross-harness behavior consistent for plaintext tools.

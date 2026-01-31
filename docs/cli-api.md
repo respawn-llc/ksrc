@@ -190,6 +190,33 @@ Diagnostics for project detection, Gradle cache accessibility, and source availa
 
 ---
 
+### `ksrc mcp`
+Run an MCP server over stdio for tool integrations.
+
+**Usage**
+```
+ksrc mcp [flags]
+```
+
+**Flags**
+- `--tools <list>`: Comma-separated tool list (default: `search,cat,deps`; use `all` for all tools)
+
+**Default tools**
+- `search`
+- `cat`
+- `deps`
+
+**Optional tools (enable via --tools)**
+- `fetch`
+- `resolve`
+- `where`
+
+**Notes**
+- Transport is stdio only; clients should spawn `ksrc mcp` via `mcp.json`.
+- Outputs are plain text matching CLI formats.
+
+---
+
 ## File Identifier
 `<file-id>` is a fully qualified path to a file inside a source JAR:
 `group:artifact:version!/path/inside/jar.kt`

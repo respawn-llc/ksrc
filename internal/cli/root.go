@@ -36,6 +36,7 @@ func NewRootCommand(app *App) *cobra.Command {
 	cmd.AddCommand(newFetchCmd(app))
 	cmd.AddCommand(newWhereCmd(app))
 	cmd.AddCommand(newDoctorCmd(app))
+	cmd.AddCommand(newMcpCmd(app))
 
 	return cmd
 }
