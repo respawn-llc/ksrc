@@ -166,6 +166,9 @@ func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest)
 		ApplyFilters:          true,
 		AllowCacheFallback:    true,
 	}
+	if resReq.Group == "" && resReq.Artifact == "" && resReq.Version == "" {
+		resReq.All = true
+	}
 	service := resolution.Service{Runner: s.runner, Verbose: s.verbose}
 	result, err := service.ResolveSources(ctx, resReq)
 	if err != nil {
