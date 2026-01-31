@@ -415,6 +415,7 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 		if err != nil {
 			return toolError(err), nil
 		}
+		emitDiagnostics(result.Meta, s.verbose)
 		if len(result.Sources) == 0 {
 			return toolError(noSourcesError(coord.Group, coord.Artifact, coord.Version)), nil
 		}
