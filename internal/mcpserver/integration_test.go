@@ -75,10 +75,10 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 	searchRes, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "search",
 		Arguments: map[string]any{
-			"query":      "public class LocalDate",
-			"group":      "org.jetbrains.kotlinx",
-			"artifact":   "kotlinx-datetime",
-			"project":    projectDir,
+			"query":       "public class LocalDate",
+			"group":       "org.jetbrains.kotlinx",
+			"artifact":    "kotlinx-datetime",
+			"project":     projectDir,
 			"subprojects": []string{},
 		},
 	})

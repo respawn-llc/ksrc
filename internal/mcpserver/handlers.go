@@ -11,8 +11,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/respawn-app/ksrc/internal/cat"
 	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/respawn-app/ksrc/internal/resolution"
+	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/respawn-app/ksrc/internal/search"
 )
 

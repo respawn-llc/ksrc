@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/respawn-app/ksrc/internal/resolution"
+	"github.com/respawn-app/ksrc/internal/resolve"
 )
 
 func joinCSV(values []string) string {
