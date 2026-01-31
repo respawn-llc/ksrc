@@ -25,42 +25,42 @@ func registerTools(server *mcp.Server, state *toolState, tools ToolSet) {
 	if tools.Enabled(ToolSearch) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolSearch),
-			Description: "Locate Gradle dependency sources. Use this first; avoid browsing .gradle directly. Use the file-id returned here with the cat tool to read the file contents.",
+			Description: "Avoid directly accessing `.gradle`; Instead, proactively use this tool to find third-party Gradle dependency sources & learn unfamiliar APIs. Start by calling `search` (this tool) and pass `query` (rg-style globs) to find matches. This returns file-id and the match: `group:artifact:version!/path/inside/jar.kt line:col: <context>. Then pass returned file-id to the `cat` tool to read the file content",
 			InputSchema: mustInputSchema[SearchInput](),
 		}, state.handleSearch)
 	}
 	if tools.Enabled(ToolCat) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolCat),
-			Description: "Read a file by file-id returned from search. Provide lines as \"A,B\" to limit output; avoid reading large files in full.",
+			Description: "Read a file by file-id returned from ksrc `search` tool. Recommended: pass `lines` range as \"A,B\" to avoid reading large files.",
 			InputSchema: mustInputSchema[CatInput](),
 		}, state.handleCat)
 	}
 	if tools.Enabled(ToolDeps) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolDeps),
-			Description: "List resolved dependencies and whether sources are available for each one. Use to inspect or filter dependency availability.",
+			Description: "List resolved dependencies and whether their sources are available. Use when no matches or sources are found unexpectedly. By default, search already download deps, but you may need to use/ ask the user to enable `fetch` tool if you need to fetch a dependency that your project does not depend on.",
 			InputSchema: mustInputSchema[DepsInput](),
 		}, state.handleDeps)
 	}
 	if tools.Enabled(ToolFetch) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolFetch),
-			Description: "Ensure sources for a coordinate exist in Gradle caches.",
+			Description: "Ensure sources for a coordinate exist in Gradle caches. You may need to call this if current `project` (by default the cwd) doesn't directly use the target dependency, e.g. composite builds or multiple subprojects",
 			InputSchema: mustInputSchema[FetchInput](),
 		}, state.handleFetch)
 	}
 	if tools.Enabled(ToolResolve) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolResolve),
-			Description: "Resolve dependency sources.",
+			Description: "Resolve dependency source jars. Use this to list all source jars that may contain needed dependency, or when diagnosing missing sources.",
 			InputSchema: mustInputSchema[ResolveInput](),
 		}, state.handleResolve)
 	}
 	if tools.Enabled(ToolWhere) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolWhere),
-			Description: "Locate cached source artifact or file.",
+			Description: "Locate cached source artifact or file and return its full path. Use when diagnosing missing sources or when you want to manually operate on the source file.",
 			InputSchema: mustInputSchema[WhereInput](),
 		}, state.handleWhere)
 	}
@@ -71,75 +71,75 @@ func toolName(name string) string {
 }
 
 type SearchInput struct {
-	Query       string   `json:"query" jsonschema:"search pattern"`
-	Context     int      `json:"context,omitempty" jsonschema:"rg context lines"`
-	Group       string   `json:"group,omitempty" jsonschema:"group filter"`
-	Artifact    string   `json:"artifact,omitempty" jsonschema:"artifact filter"`
-	Version     string   `json:"version,omitempty" jsonschema:"version filter"`
-	Config      []string `json:"config,omitempty" jsonschema:"Gradle config filters"`
-	Project     string   `json:"project,omitempty" jsonschema:"project path"`
-	Subprojects []string `json:"subprojects,omitempty" jsonschema:"subproject filters"`
-	RgArgs      []string `json:"rgArgs,omitempty" jsonschema:"extra rg args"`
-	Scope       string   `json:"scope,omitempty" jsonschema:"dependency scope"`
-	Targets     []string `json:"targets,omitempty" jsonschema:"target filters"`
+	Query       string   `json:"query" jsonschema:"search pattern as a rg-style glob. required."`
+	Context     int      `json:"context,omitempty" jsonschema:"context lines (optional, default: 0)"`
+	Group       string   `json:"group,omitempty" jsonschema:"group filter (optional, default: all dependencies)"`
+	Artifact    string   `json:"artifact,omitempty" jsonschema:"artifact filter (optional, default: all artifacts)"`
+	Version     string   `json:"version,omitempty" jsonschema:"version filter (optional, default: all versions)"`
+	Config      []string `json:"config,omitempty" jsonschema:"Gradle config filters (optional, default: scope defaults)"`
+	Project     string   `json:"project,omitempty" jsonschema:"project path (optional, default: . (cwd))"`
+	Subprojects []string `json:"subprojects,omitempty" jsonschema:"subproject filters (optional, default: all subprojects)"`
+	RgArgs      []string `json:"rgArgs,omitempty" jsonschema:"extra rg args (optional, default: none)"`
+	Scope       string   `json:"scope,omitempty" jsonschema:"dependency scope (optional, default: compile)"`
+	Targets     []string `json:"targets,omitempty" jsonschema:"KMP target filters (optional, default: all targets)"`
 }
 
 type CatInput struct {
-	FileID string `json:"fileId" jsonschema:"file-id from search"`
-	Lines  string `json:"lines,omitempty" jsonschema:"line range A,B or A:B or A-B or A B or A..B or A;B"`
+	FileID string `json:"fileId" jsonschema:"file-id from search tool output. required."`
+	Lines  string `json:"lines,omitempty" jsonschema:"line range A,B (optional, default: entire file)"`
 }
 
 type DepsInput struct {
-	Project       string   `json:"project,omitempty" jsonschema:"project path"`
-	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope"`
-	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters"`
-	Targets       []string `json:"targets,omitempty" jsonschema:"target filters"`
-	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters"`
-	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc"`
-	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript"`
-	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds"`
-	Group         string   `json:"group,omitempty" jsonschema:"group filter"`
-	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter"`
-	Version       string   `json:"version,omitempty" jsonschema:"version filter"`
+	Project       string   `json:"project,omitempty" jsonschema:"project path (optional, default: . (cwd))"`
+	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope (optional, default: compile)"`
+	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters (optional, default: scope defaults)"`
+	Targets       []string `json:"targets,omitempty" jsonschema:"target filters (optional, default: all targets)"`
+	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters (optional, default: all subprojects)"`
+	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
+	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
+	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
+	Group         string   `json:"group,omitempty" jsonschema:"group filter (optional, default: all dependencies)"`
+	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter (optional, default: all artifacts)"`
+	Version       string   `json:"version,omitempty" jsonschema:"version filter (optional, default: all versions)"`
 }
 
 type FetchInput struct {
-	Group         string `json:"group" jsonschema:"group"`
-	Artifact      string `json:"artifact" jsonschema:"artifact"`
-	Version       string `json:"version" jsonschema:"version"`
-	Project       string `json:"project,omitempty" jsonschema:"project path"`
-	Buildsrc      *bool  `json:"buildsrc,omitempty" jsonschema:"include buildSrc"`
-	Buildscript   *bool  `json:"buildscript,omitempty" jsonschema:"include buildscript"`
-	IncludeBuilds *bool  `json:"includeBuilds,omitempty" jsonschema:"include builds"`
+	Group         string `json:"group" jsonschema:"group. required."`
+	Artifact      string `json:"artifact" jsonschema:"artifact. required."`
+	Version       string `json:"version" jsonschema:"version. required."`
+	Project       string `json:"project,omitempty" jsonschema:"project path (optional, default: .)"`
+	Buildsrc      *bool  `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
+	Buildscript   *bool  `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
+	IncludeBuilds *bool  `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
 }
 
 type ResolveInput struct {
-	Project       string   `json:"project,omitempty" jsonschema:"project path"`
-	Group         string   `json:"group,omitempty" jsonschema:"group filter"`
-	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter"`
-	Version       string   `json:"version,omitempty" jsonschema:"version filter"`
-	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope"`
-	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters"`
-	Targets       []string `json:"targets,omitempty" jsonschema:"target filters"`
-	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters"`
-	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc"`
-	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript"`
-	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds"`
+	Project       string   `json:"project,omitempty" jsonschema:"project path (optional, default: .)"`
+	Group         string   `json:"group,omitempty" jsonschema:"group filter (optional, default: all dependencies)"`
+	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter (optional, default: all artifacts)"`
+	Version       string   `json:"version,omitempty" jsonschema:"version filter (optional, default: all versions)"`
+	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope (optional, default: compile)"`
+	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters (optional, default: scope defaults)"`
+	Targets       []string `json:"targets,omitempty" jsonschema:"target filters (optional, default: all targets)"`
+	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters (optional, default: all subprojects)"`
+	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
+	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
+	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
 }
 
 type WhereInput struct {
-	PathOrCoord   string   `json:"pathOrCoord" jsonschema:"file-id or path/coord"`
-	Project       string   `json:"project,omitempty" jsonschema:"project path"`
-	Group         string   `json:"group,omitempty" jsonschema:"group filter"`
-	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter"`
-	Version       string   `json:"version,omitempty" jsonschema:"version filter"`
-	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope"`
-	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters"`
-	Targets       []string `json:"targets,omitempty" jsonschema:"target filters"`
-	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters"`
-	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc"`
-	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript"`
-	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds"`
+	PathOrCoord   string   `json:"pathOrCoord" jsonschema:"file-id or path/coord. required."`
+	Project       string   `json:"project,omitempty" jsonschema:"project path (optional, default: . (cwd))"`
+	Group         string   `json:"group,omitempty" jsonschema:"group filter (optional, default: all dependencies; required for path lookup)"`
+	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter (optional, default: all artifacts; required for path lookup)"`
+	Version       string   `json:"version,omitempty" jsonschema:"version filter (optional, default: all versions)"`
+	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope (optional, default: compile)"`
+	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters (optional, default: scope defaults)"`
+	Targets       []string `json:"targets,omitempty" jsonschema:"target filters (optional, default: all targets)"`
+	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters (optional, default: all subprojects)"`
+	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
+	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
+	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
 }
 
 func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -176,7 +176,7 @@ func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest)
 		return toolError(noSourcesError(resReq.Group, resReq.Artifact, resReq.Version)), nil
 	}
 	if _, err := s.runner.LookPath("rg"); err != nil {
-		return toolError(fmt.Errorf("rg not found on PATH")), nil
+		return toolError(fmt.Errorf("rg not found on PATH, ask the user to install ripgrep first. The user can run `ksrc doctor` to get guidance.")), nil
 	}
 
 	rgArgs := cleanList(input.RgArgs)
@@ -221,7 +221,7 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 	}
 	fileID := strings.TrimSpace(input.FileID)
 	if fileID == "" {
-		return toolError(fmt.Errorf("fileId is required")), nil
+		return toolError(fmt.Errorf("fileId is required. Obtain it from `search` tool output, the file id is the string before the line:column")), nil
 	}
 	coord, inner, err := resolve.ParseFileID(fileID)
 	if err != nil {
@@ -304,7 +304,7 @@ func (s *toolState) handleFetch(ctx context.Context, call *mcp.CallToolRequest) 
 	artifact := strings.TrimSpace(input.Artifact)
 	version := strings.TrimSpace(input.Version)
 	if group == "" || artifact == "" || version == "" {
-		return toolError(fmt.Errorf("group, artifact, and version are required")), nil
+		return toolError(fmt.Errorf("group, artifact, and version are required. Obtain them from the file id returned by `search` or `deps`")), nil
 	}
 	coord := resolve.Coord{Group: group, Artifact: artifact, Version: version}
 	resReq := resolution.Request{
@@ -532,7 +532,7 @@ func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, e
 			return src.Path, nil
 		}
 	}
-	return "", fmt.Errorf("source jar not found for %s. Try: ksrc fetch %s", coord.String(), coord.String())
+	return "", fmt.Errorf("source jar not found for %s. Try: calling `fetch() tool, or if you don't see it, ask the user to enable with `ksrc mcp --tools=all`. %s", coord.String(), coord.String())
 }
 
 func findFileInJars(sources []resolve.SourceJar, inner string) (string, resolve.Coord, string, error) {
@@ -542,7 +542,7 @@ func findFileInJars(sources []resolve.SourceJar, inner string) (string, resolve.
 			return src.Path, src.Coord, inner, nil
 		}
 	}
-	return "", resolve.Coord{}, "", fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --artifact <artifact>", inner)
+	return "", resolve.Coord{}, "", fmt.Errorf("file not found in resolved sources: %s. Try specifying: `project` (for monorepos), `scope` for build time deps etc., or `configs` for non-standard compilations.", inner)
 }
 
 func formatRgArgs(plan search.ExecPlan) string {
