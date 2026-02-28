@@ -178,7 +178,7 @@ func runZipSearch(ctx context.Context, runner executil.Runner, opts Options) ([]
 		searchJars = append(searchJars, j.Path)
 	}
 
-	args := []string{"--search-zip", "--no-heading", "--line-number", "--column", "--color=never", "--with-filename", "-g", "*.kt"}
+	args := []string{"--search-zip", "--no-heading", "--line-number", "--column", "--color=never", "--with-filename"}
 	args = append(args, opts.RGArgs...)
 	args = append(args, "--")
 	args = append(args, opts.Pattern)
@@ -226,7 +226,7 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 		searchDirs = append(searchDirs, dir)
 	}
 
-	args := []string{"--no-heading", "--line-number", "--column", "--color=never", "--with-filename", "-g", "*.kt"}
+	args := []string{"--no-heading", "--line-number", "--column", "--color=never", "--with-filename"}
 	args = append(args, opts.RGArgs...)
 	args = append(args, "--")
 	args = append(args, opts.Pattern)

@@ -14,7 +14,7 @@ If you want faster execution & less noise, consider adding:
 
 2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
-File-id format: `group:artifact:version!/path/inside/jar.kt`
+File-id format: `group:artifact:version!/path/inside/jar.kt` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
 
 ## Common issues
 - If, unexpectedly, no matches are found, try `--project` with app project (not monorepo root), specifying `--scope` (esp. for build-time deps), or `ksrc doctor`.
