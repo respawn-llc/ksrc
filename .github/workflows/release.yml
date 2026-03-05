@@ -15,12 +15,12 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v6.3.0
         with:
           go-version-file: go.mod
           check-latest: true
@@ -54,7 +54,7 @@ jobs:
 
       - name: Build changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v6
+        uses: mikepenz/release-changelog-builder-action@v6.1.1
         with:
           commitMode: true
           configuration: ".github/changelog_config.json"
@@ -85,7 +85,7 @@ jobs:
           done
 
       - name: Create draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.5.0
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
@@ -97,11 +97,11 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6.0.2
         with:
           repository: respawn-app/homebrew-tap
           path: homebrew-tap
@@ -139,7 +139,7 @@ jobs:
             }
 
       - name: Create tap PR
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@v8.1.0
         with:
           token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
           path: homebrew-tap

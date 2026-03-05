@@ -88,7 +88,7 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 		t.Fatalf("search tool: %v", err)
 	}
 	searchText := textFromResult(searchRes)
-	expectedFileID := "org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/" + inner
+	expectedFileID := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/" + inner
 	if !strings.Contains(searchText, expectedFileID) {
 		t.Fatalf("unexpected search output: %s", searchText)
 	}

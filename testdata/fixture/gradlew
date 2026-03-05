@@ -2,9 +2,9 @@
 # Fake gradle wrapper for tests.
 for arg in "$@"; do
   if [ "$arg" = "ksrcSources" ]; then
-    echo "KSRCDEP|org.jetbrains.kotlinx:kotlinx-datetime:0.6.1"
+    echo "KSRCDEP|org.jetbrains.kotlinx:kotlinx-datetime:0.7.1"
     if [ -n "$KSRC_TEST_JAR" ]; then
-      echo "KSRC|org.jetbrains.kotlinx:kotlinx-datetime:0.6.1|$KSRC_TEST_JAR"
+      echo "KSRC|org.jetbrains.kotlinx:kotlinx-datetime:0.7.1|$KSRC_TEST_JAR"
     fi
   fi
 done

@@ -28,7 +28,7 @@ func TestSearchAndCatIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	if !strings.Contains(searchOut, "org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/"+inner) {
+	if !strings.Contains(searchOut, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/"+inner) {
 		t.Fatalf("unexpected search output: %s", searchOut)
 	}
 
@@ -68,7 +68,7 @@ func TestSearchContextAndPassThrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	fileID := "org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/" + inner
+	fileID := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/" + inner
 	if !strings.Contains(ctxOut, fileID+" 1:0:before") || !strings.Contains(ctxOut, fileID+" 3:0:after") {
 		t.Fatalf("context lines missing: %s", ctxOut)
 	}
@@ -110,7 +110,7 @@ func TestSearchDefaultsToAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/"+inner) {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/"+inner) {
 		t.Fatalf("unexpected search output: %s", out)
 	}
 }

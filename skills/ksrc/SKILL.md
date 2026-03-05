@@ -10,7 +10,7 @@ If you want faster execution & less noise, consider adding:
 - `--subproject` to help discovery for monorepos/large modular apps
 - `--targets` to limit to specific KMP targets. 
 
-2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
+2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
 File-id format: `group:artifact:version!/path/inside/jar.ext` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
 

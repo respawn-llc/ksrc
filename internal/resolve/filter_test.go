@@ -3,7 +3,7 @@ package resolve
 import "testing"
 
 func TestMatchModule(t *testing.T) {
-	coord := Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.6.1"}
+	coord := Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"}
 	if !MatchModule("org.jetbrains.kotlinx:kotlinx-datetime", coord) {
 		t.Fatal("expected exact module match")
 	}
