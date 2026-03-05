@@ -1,47 +1,90 @@
-## Project Purpose
-`ksrc` is a CLI for one‑liner search and file read of Kotlin dependency sources. It resolves dependency versions from the project, ensures source JARs are present in **Gradle caches**, and runs `rg` over those JARs.
+## Context
+`ksrc` is a Go CLI for searching and reading Kotlin/Java dependency sources resolved from Gradle projects.
+It resolves dependencies via Gradle, ensures `-sources.jar` artifacts exist in Gradle caches, then uses `rg` for search and zip reads for `cat/open`.
+The tool is designed for scriptable/agent workflows: stable output, file-id chaining, and zero mutation of the target project.
 
-## Stack
-- Language: Go 1.22+
-- CLI: cobra
-- Search: external `rg`
-- Gradle integration: per‑invocation init script (`-I <temp>`)
-- File read: Go `archive/zip` + line slicing
+Primary docs to keep aligned with code:
+- `README.md`
+- `docs/cli-api.md`
+- `docs/decisions.md`
+- `skills/ksrc/SKILL.md`
 
-## Philosophy / Rules
-- Zero project mutation: no files written to the repo.
-- No custom cache/index: use Gradle caches only.
-- Minimize agent context pollution, compact outputs.
-- Deterministic resolution: prefer project‑resolved versions; only fall back to cache‑latest if absent.
-- Keep output stable and parseable.
-- Fixed bug? -> Add a regression test.
-- New feature? -> Cover with unit tests without asking, ask user if they want integration tests.
-- Read `docs/decisions.md` for architecture and decisions; keep it updated with new decisions from the team.
+## Commands/workflow guidance
 
-## Directory / Module Structure (planned)
-- `cmd/` — CLI entry points and wiring
-- `gradle/` — init script generation, Gradle execution, output parsing
-- `resolve/` — version selection, module filtering, cache scanning
-- `search/` — rg invocation, result formatting, file‑id emission
-- `cat/` — zip file read + `--lines` slicing
-- `internal/` — shared helpers (logging, error codes)
-- `testdata/` — minimal Gradle fixtures
-- `docs/` — CLI spec and stack
+- Run the local quality gate used in CI before pushing:
+```bash
+./scripts/ci-format.sh
+go vet ./...
+go test ./...
+```
 
-## Common Tasks
-- Add/adjust commands: update cobra wiring in `cmd/`
-- Resolution changes: keep init script minimal and compatible with multiple Gradle versions.
-- Search changes: must keep `rg` call scoped to resolved JARs only.
-- After code changes, rebuild the binary to `./bin/ksrc` so the symlinked CLI updates for the user.
-- Brew manipulation: The brew tap with the ksrc formulat is separate repo at https://github.com/respawn-app/homebrew-tap . It's usually cloned at the parent dir of the cwd (./../homebrew-tap/)
-- MCP server: `ksrc mcp` (stdio). Default tools: `search`, `cat`, `deps`. Enable extras via `--tools=<list>` or `--tools=all`.
+- Rebuild local CLI binary after code changes:
+```bash
+KSRC_VERSION="$(tr -d ' \n' < VERSION)"
+go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${KSRC_VERSION}" -o ./bin/ksrc ./cmd/ksrc
+```
 
-## Tests
-- Unit: parsing, version selection, file‑id handling.
-- Integration: run against `testdata/` Gradle fixture; no repo mutation; asserts on output format.
+- Run a fast functional smoke check against the sample project:
+```bash
+./bin/ksrc search LocalDate --module org.jetbrains.kotlinx:kotlinx-datetime --project ./sample
+```
 
-## Clean Merge Expectations
-- Keep changes focused;
-- Update ./docs and ./skills when CLI flags, outputs, APIs or formats change.
-- Release process: see ./docs/release-workflow.md
-- Update AGENTS.md (this file) with learnings/rules/memories for future you.
+- For release-related changes, follow `docs/release-workflow.md` and use `scripts/update-brew-tap.sh` instead of manual formula edits.
+
+## Testing instructions
+- Add a regression test for every bug fix.
+- Add unit tests for every new feature.
+- Keep tests in the package being changed (`internal/<pkg>/*_test.go`) and prefer deterministic fakes/stubs over networked/real-project dependencies.
+
+Test layers used in this repo:
+- Default test suite (`go test ./...`): unit tests plus lightweight integration tests using `testdata/fixture/gradlew` fake wrapper and temporary jars.
+- Real Gradle integration suite: gated by `KSRC_INTEGRATION=1` in `internal/cli/integration_gradle_test.go`; uses `testdata/integration` and `sample`.
+- MCP integration test: `internal/mcpserver/integration_test.go` builds and launches `ksrc mcp` and exercises tool calls.
+
+Useful test commands:
+```bash
+go test ./...
+go test ./internal/cli -run Integration
+KSRC_INTEGRATION=1 go test ./internal/cli -run IntegrationWithRealGradle
+go test -cover ./...
+```
+
+## Project Layout & Module Map
+- `cmd/ksrc/main.go`: CLI entrypoint.
+- `internal/cli/`: Cobra command wiring, flags, output formatting, hints.
+- `internal/resolution/`: orchestration layer from CLI to Gradle/cache resolution.
+- `internal/gradle/`: init script generation, Gradle invocation, traversal (`root -> buildSrc -> included builds`).
+- `internal/resolve/`: cache scanning, coordinate/file-id parsing, filtering/version selection.
+- `internal/search/`: `rg` execution strategy (`--search-zip` when supported, extract fallback), output parsing.
+- `internal/cat/`: zip file reads and `--lines` range parsing.
+- `internal/mcpserver/`: stdio MCP server and tool handlers.
+- `internal/executil/`: command execution abstraction used for testability.
+- `testdata/fixture/`: fake Gradle wrapper test fixture.
+- `testdata/integration/`: real Gradle integration fixture.
+- `sample/`: KMP/Android sample used for smoke coverage.
+- `docs/`: API spec, decisions, release workflow.
+- `scripts/`: CI format check, install script, brew tap update automation.
+
+## Dev environment tips
+- Build output version is injected from `VERSION` via ldflags; without that, CLI reports `dev`.
+- Keep `./bin/ksrc` current if your local shell/tooling points to it.
+
+## Architecture Notes
+- Keep command wiring thin in `internal/cli`; add behavior in domain packages (`resolution`, `gradle`, `resolve`, `search`, `cat`, `mcpserver`).
+- Preserve zero-mutation behavior for target Gradle projects; only temporary files are allowed.
+- Resolution behavior is intentional and documented in `docs/decisions.md`.
+- Gradle invocation failures fall back to cache-only resolution with warnings; this is part of UX contract.
+- Search output and file-id contract are API surfaces; keep formats stable and parseable:
+  - Search: `<file-id> <line>:<col>:<match>`
+  - File-id: `group:artifact:version!/path/inside/jar.kt`
+- MCP tools are plaintext-first; keep tool outputs in `content` and avoid introducing structured payload dependencies.
+
+## Code style
+- Follow `gofmt` strictly (`./scripts/ci-format.sh` is authoritative).
+- Keep CLI stdout machine-parseable; send diagnostics/warnings/verbose lines to stderr.
+- Reuse `executil.Runner` instead of direct `os/exec` in logic that needs test coverage.
+- Keep changes cohesive and package-local; avoid leaking command concerns into resolution/search internals.
+- When flags/output/API surface changes, update all affected docs and skill files in the same change.
+- Follow the commit style used by changelog automation: scoped/typed subject lines such as `cli: ...`, `mcp: ...`, `docs: ...`, `release: ...`, `fix: ...`.
+
+Always keep this file up-to-date when you change project behavior, workflows, flags, outputs, release process, or architecture; remove stale facts promptly, and do not add temporary notes, generic boilerplate, or frequently changing product details.
