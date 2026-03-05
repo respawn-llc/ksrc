@@ -25,7 +25,7 @@ func registerTools(server *mcp.Server, state *toolState, tools ToolSet) {
 	if tools.Enabled(ToolSearch) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolSearch),
-			Description: "Avoid directly accessing `.gradle`; Instead, proactively use this tool to find third-party Gradle dependency sources & learn unfamiliar APIs. Start by calling `search` (this tool) and pass `query` (rg-style globs) to find matches. This returns file-id and the match: `group:artifact:version!/path/inside/jar.kt line:col: <context>. Then pass returned file-id to the `cat` tool to read the file content",
+			Description: "Avoid directly accessing `.gradle`; Instead, proactively use this tool to find third-party Gradle dependency sources & learn unfamiliar APIs. Start by calling `search` (this tool) and pass `query` (rg-style globs) to find matches. This returns file-id and the match: `group:artifact:version!/path/inside/jar.ext line:col: <context>. Then pass returned file-id to the `cat` tool to read the file content",
 			InputSchema: mustInputSchema[SearchInput](),
 		}, state.handleSearch)
 	}

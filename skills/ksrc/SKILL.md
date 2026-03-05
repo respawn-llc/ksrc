@@ -1,9 +1,7 @@
 ---
 name: ksrc
-description: Search/read 3rd-party Gradle (Kotlin/Java) dependency sources. Avoid directly accessing `.gradle`; instead, proactively use this skill to inspect source code of dependencies to learn API shapes or implementations. 
+description: Search/read 3rd-party Gradle dependency sources. Avoid directly accessing `.gradle`; instead, proactively use this skill to inspect source code of dependencies to learn API shapes or implementations.
 ---
-
-## How to use:
 
 1. Search dependencies to retrieve coordinates and matches using rg-style globs: `ksrc search "class LocalDate\("`
 
@@ -14,7 +12,9 @@ If you want faster execution & less noise, consider adding:
 
 2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
-File-id format: `group:artifact:version!/path/inside/jar.kt` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
+File-id format: `group:artifact:version!/path/inside/jar.ext` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
+
+Give this tool generous timeouts. It can take a few minutes to download sources and set up gradle.
 
 ## Common issues
 - If, unexpectedly, no matches are found, try `--project` with app project (not monorepo root), specifying `--scope` (esp. for build-time deps), or `ksrc doctor`.
@@ -23,7 +23,6 @@ File-id format: `group:artifact:version!/path/inside/jar.kt` — works for any l
 - Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; re-run with `-v` to see Gradle output for debugging.
 - Gradle fails with unresolved class version: User's Local java in env is resolved to something unsupported by gradle. Help them fix Gradle<>JDK incompatibility.
 - Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow scope.
-- Give this tool generous timeouts. It can take a few minutes to download sources and set up gradle.
 
 ## Commands
 ### `ksrc search <pattern> [-- <rg-args>]`
@@ -64,8 +63,7 @@ List resolved dependencies and source availability.
 Resolve and print source JARs: `group:artifact:version|/path/to/sources.jar`.
 
 ### `ksrc fetch <coord>`
-Ensure sources for a coordinate exist: `group:artifact:version`.
-Usually only needed with offline mode.
+Ensure sources for a coordinate exist: `group:artifact:version`. Usually only needed with offline mode.
 
 ### `ksrc where <path|coord>`
 Locate cached source JAR or file.

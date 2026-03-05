@@ -76,7 +76,7 @@ go test -cover ./...
 - Gradle invocation failures fall back to cache-only resolution with warnings; this is part of UX contract.
 - Search output and file-id contract are API surfaces; keep formats stable and parseable:
   - Search: `<file-id> <line>:<col>:<match>`
-  - File-id: `group:artifact:version!/path/inside/jar.kt`
+  - File-id: `group:artifact:version!/path/inside/jar.ext`
 - MCP tools are plaintext-first; keep tool outputs in `content` and avoid introducing structured payload dependencies.
 
 ## Code style

@@ -1,16 +1,16 @@
 # ksrc
 
-**One‑liner search and read for Kotlin 3rd-party dependency sources for AI agents.**
+**One‑liner search and read for Gradle 3rd-party dependency sources for AI agents.**
 
-Your AI agents take ~10 steps just to see a single Kotlin function's signature in a third-party library. `ksrc` turns that into two commands and ~4x less tokens.
+Your AI agents take ~10 steps just to see a single function signature in a third-party library. `ksrc` turns that into two commands and ~4x less tokens.
 
 ## What it is
 
-It's a CLI utility to enable efficient source code search for AI agents working with Kotlin.
+It's a CLI utility to enable efficient dependency source search for AI agents working with Gradle projects.
 
 Ever saw an AI agent find a function's signature in TypeScript/Python? Simple `rg` over `node_modules` and a `sed` call is all it needs to discover APIs and signatures.
 
-With Kotlin/Gradle, agents have to take a 15-step journey to download, locate, unpack and ripgrep source jars.
+With Gradle ecosystems, agents have to take a 15-step journey to download, locate, unpack and ripgrep source jars.
 `ksrc` turns 16k tokens wasted on that into 2 CLI commands.
 
 ## 1. Install the tool

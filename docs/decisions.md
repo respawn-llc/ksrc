@@ -3,7 +3,7 @@
 This file records non-obvious decisions, tradeoffs, and architecture notes. Update it whenever we make a new call.
 
 ## Purpose
-Provide single-command search and file read for Kotlin dependency sources, without mutating the project and without a ksrc cache/index.
+Provide single-command search and file read for Gradle dependency sources, without mutating the project and without a ksrc cache/index.
 
 ## Goals
 - One-liner search (`ksrc search "<pattern>" --module group:artifact` or `ksrc search "<pattern>"`).
@@ -11,12 +11,12 @@ Provide single-command search and file read for Kotlin dependency sources, witho
 - Deterministic dependency resolution using the project graph.
 - Use Gradle caches only; no repo writes.
 - No extra setup or discovery, out-of-the box "good enough" search results with no fiddling or per-project setup, with broad support. 
-- Prioritize KMP projects (all targets), then android projects, then pure kotlin (jvm backend) projects, when deciding tradeoffs.
+- Prioritize KMP projects (all targets), then Android projects, then JVM Gradle projects, when deciding tradeoffs.
 
 ## Non-goals
 - IDE integration.
 - Build/test/run tasks.
-- Cross-language source search.
+- Source search outside Gradle dependency sources.
 
 ## Resolution Order (as of 2026-01-07)
 Order by likelihood of success and cost. Stop after the first stage that yields sources.

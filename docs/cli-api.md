@@ -62,8 +62,8 @@ ksrc cat <file-id|path> [flags]
 ```
 
 **Path Forms**
-- Relative source path: `org/jetbrains/kotlinx/coroutines/flow/Flow.kt`
-- Fully qualified path: `group:artifact:version!/org/.../Flow.kt`
+- Relative source path: `com/example/http/HttpClient.java`
+- Fully qualified path: `group:artifact:version!/com/example/http/HttpClient.java`
 
 **Flags**
 - `--project <path>`
@@ -141,7 +141,7 @@ Locate the Gradle cached source artifact or file.
 **Usage**
 ```
 ksrc where org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1
-ksrc where org/jetbrains/kotlinx/coroutines/flow/Flow.kt
+ksrc where com/example/http/HttpClient.java
 ```
 
 **Flags**
@@ -219,6 +219,6 @@ ksrc mcp [flags]
 
 ## File Identifier
 `<file-id>` is a fully qualified path to a file inside a source JAR:
-`group:artifact:version!/path/inside/jar.kt`
+`group:artifact:version!/path/inside/jar.ext`
 
 `ksrc search` emits `<file-id>` in every result line so clients can call `ksrc cat <file-id>` with no extra resolution steps.

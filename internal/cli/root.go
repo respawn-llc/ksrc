@@ -19,7 +19,7 @@ func NewRootCommand(app *App) *cobra.Command {
 			"  - Gradle not found: run in a Gradle project or set --project to the root.\n" +
 			"  - Unsupported class version: fix Gradle <-> JDK mismatch (JAVA_HOME).\n\n" +
 			"File-id format:\n" +
-			"  group:artifact:version!/path/inside/jar.kt",
+			"  group:artifact:version!/path/inside/jar.ext",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
