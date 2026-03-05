@@ -26,7 +26,7 @@ func TestIntegrationWithRealGradle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/") {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/") {
 		t.Fatalf("unexpected search output: %s", out)
 	}
 
@@ -56,7 +56,7 @@ func TestIntegrationWithSampleKmp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.6.1!/") {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/") {
 		t.Fatalf("unexpected search output: %s", out)
 	}
 }

@@ -1,7 +1,7 @@
 [versions]
-kotlin = "2.3.0"
-agp = "9.0.0"
-kotlinx-datetime = "0.6.1"
+kotlin = "2.3.10"
+agp = "9.1.0"
+kotlinx-datetime = "0.7.1"
 androidCompileSdk = "36"
 androidMinSdk = "28"
 androidTargetSdk = "36"
