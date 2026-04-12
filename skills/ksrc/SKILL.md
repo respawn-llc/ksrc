@@ -20,7 +20,7 @@ Give this tool generous timeouts. It can take a few minutes to download sources 
 - If, unexpectedly, no matches are found, try `--project` with app project (not monorepo root), specifying `--scope` (esp. for build-time deps), or `ksrc doctor`.
 - `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
 - Gradle not found: a) run in a Gradle project dir, b) set `--project` path explicitly, c) install gradle on machine.
-- Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; re-run with `-v` to see Gradle output for debugging.
+- Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; when no version is pinned it picks the highest cached source-bearing version under Maven-style ordering. Re-run with `-v` to see Gradle output for debugging.
 - Gradle fails with unresolved class version: User's Local java in env is resolved to something unsupported by gradle. Help them fix Gradle<>JDK incompatibility.
 - Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow scope.
 

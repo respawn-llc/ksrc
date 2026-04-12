@@ -12,7 +12,7 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 
 ## Resolution Notes
 - If Gradle resolution fails, `ksrc` falls back to cache-only resolution and emits a warning.
-- Cache-only mode may return results that don't match the current project; it uses the latest cached version if no version is specified.
+- Cache-only mode may return results that don't match the current project; it uses the highest cached source-bearing version under Maven-style version ordering if no version is specified.
 - With `--all`, cache-only mode scans all cached sources (can be large/slow).
 
 ### `ksrc search <pattern>`

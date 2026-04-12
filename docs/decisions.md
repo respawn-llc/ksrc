@@ -49,7 +49,8 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - This provides a better first-try UX for Android repos without making the default slow for every run.
 
 ## Error Handling & Warnings
-- Root build failures are fatal.
+- Root build Gradle execution failures are warnings; resolution falls back to cache-only mode.
+- Cache-only fallback may return results that do not match the current project exactly; when version is omitted, selector fallback chooses the highest cached source-bearing version under Maven-style version ordering. Warnings make degraded mode explicit.
 - Fallback failures (buildSrc/included builds) are warnings; the command continues.
 - Warnings are emitted to stderr.
 
@@ -76,3 +77,9 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - `internal/search` extracts source jars into a persistent cache under the user cache dir, keyed by canonical absolute jar path.
 - This intentionally models production Gradle cache behavior, where artifact paths are already checksum-addressed, and avoids extra hashing or metadata churn in the hot search path.
 - `KSRC_EXTRACT_CACHE_DIR` overrides the cache root for tests and local debugging.
+
+## 2026-04-12: Cache fallback uses Maven-style version ordering
+- `internal/resolve` no longer uses custom token/lexicographic version ordering for cache fallback selection.
+- Version comparison follows Maven-style qualifier semantics (`alpha`, `beta`, `milestone`, `rc`, `snapshot`, release, `sp`) plus common aliases, with `_` treated as a separator for cache version parity.
+- When version is omitted during cache fallback, selection walks cached versions in semantic descending order and returns the first version that actually has a cached `-sources.jar`.
+- This avoids silently picking prerelease or missing-source cache entries ahead of the correct release jar.
