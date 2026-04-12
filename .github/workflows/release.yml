@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
-      - uses: actions/setup-go@v6.3.0
+      - uses: actions/setup-go@v6.4.0
         with:
           go-version-file: go.mod
           check-latest: true
@@ -54,7 +54,7 @@ jobs:
 
       - name: Build changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v6.1.1
+        uses: mikepenz/release-changelog-builder-action@v6.2.1
         with:
           commitMode: true
           configuration: ".github/changelog_config.json"
@@ -85,7 +85,7 @@ jobs:
           done
 
       - name: Create draft release
-        uses: softprops/action-gh-release@v2.5.0
+        uses: softprops/action-gh-release@v3.0.0
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
@@ -118,7 +118,7 @@ jobs:
         run: scripts/update-brew-tap.sh --tap "$GITHUB_WORKSPACE/homebrew-tap"
 
       - name: Ensure pr-pull label exists
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9.0.0
         with:
           github-token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
           script: |
@@ -139,7 +139,7 @@ jobs:
             }
 
       - name: Create tap PR
-        uses: peter-evans/create-pull-request@v8.1.0
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
           path: homebrew-tap

@@ -1,6 +1,6 @@
 {
   "name": "ksrc",
   "description": "Ksrc CLI skill for searching/reading Kotlin dependency sources",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "repository": "https://github.com/respawn-app/ksrc"
 }
