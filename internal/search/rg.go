@@ -250,6 +250,8 @@ const (
 
 var extractCacheLocks sync.Map
 
+var userCacheDir = os.UserCacheDir
+
 func extractJarCached(src string) (string, error) {
 	cacheRoot, err := searchExtractCacheRoot()
 	if err != nil {
@@ -311,9 +313,9 @@ func searchExtractCacheRoot() (string, error) {
 		}
 		return filepath.Clean(abs), nil
 	}
-	base, err := os.UserCacheDir()
+	base, err := userCacheDir()
 	if err != nil {
-		return "", err
+		return filepath.Join(os.TempDir(), extractCacheRootName), nil
 	}
 	return filepath.Join(base, extractCacheRootName), nil
 }
