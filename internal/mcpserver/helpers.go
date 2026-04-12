@@ -70,23 +70,7 @@ func noSourcesHint(group, artifact, version string) string {
 }
 
 func filterCoords(coords []resolve.Coord, group, artifact, version string) []resolve.Coord {
-	if group == "" && artifact == "" && version == "" {
-		return coords
-	}
-	out := make([]resolve.Coord, 0, len(coords))
-	for _, coord := range coords {
-		if !resolve.MatchAny(group, coord.Group) {
-			continue
-		}
-		if !resolve.MatchAny(artifact, coord.Artifact) {
-			continue
-		}
-		if !resolve.MatchAny(version, coord.Version) {
-			continue
-		}
-		out = append(out, coord)
-	}
-	return out
+	return resolve.FilterCoords(coords, "", group, artifact, version)
 }
 
 func emitDiagnostics(meta resolution.ResolveMeta, verbose bool) {
