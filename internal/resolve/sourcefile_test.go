@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/respawn-app/ksrc/internal/cat"
+	"github.com/respawn-app/ksrc/internal/testutil"
 )
 
 func TestFindFileInSourcesAllowsEmptyFile(t *testing.T) {
@@ -28,6 +31,42 @@ func TestFindFileInSourcesAllowsEmptyFile(t *testing.T) {
 	}
 	if foundInner != inner {
 		t.Fatalf("unexpected inner path: %s", foundInner)
+	}
+}
+
+func TestFindFileInSourcesUsesZipDirectoryEntries(t *testing.T) {
+	jarPath := filepath.Join(t.TempDir(), "broken-body.jar")
+	inner := "com/example/Entry.kt"
+	if err := writeZipFile(t, jarPath, inner, "class Entry\n"); err != nil {
+		t.Fatalf("write zip: %v", err)
+	}
+	if err := testutil.CorruptZipEntryMethod(jarPath, inner, 99); err != nil {
+		t.Fatalf("corrupt zip entry method: %v", err)
+	}
+	if _, err := cat.ReadFileFromZip(jarPath, inner, nil); err == nil {
+		t.Fatal("expected entry body read to fail after method rewrite")
+	}
+
+	sources := []SourceJar{{
+		Coord: Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"},
+		Path:  jarPath,
+	}}
+
+	source, foundInner, ok := FindFileInSources(sources, inner)
+	if !ok {
+		t.Fatal("expected file to be found from zip metadata")
+	}
+	if source.Path != jarPath {
+		t.Fatalf("unexpected jar path: %s", source.Path)
+	}
+	if foundInner != inner {
+		t.Fatalf("unexpected inner path: %s", foundInner)
+	}
+	if found, err := cat.HasFileInZip(jarPath, inner); err != nil || !found {
+		t.Fatalf("expected HasFileInZip to find entry, found=%v err=%v", found, err)
+	}
+	if found, err := cat.HasFileInZip(jarPath, "missing/File.kt"); err != nil || found {
+		t.Fatalf("expected HasFileInZip to miss unknown entry, found=%v err=%v", found, err)
 	}
 }
 

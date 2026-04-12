@@ -38,10 +38,10 @@ func TestParseRgContextLine(t *testing.T) {
 func TestSearchKeepsMatchTextContainingColon(t *testing.T) {
 	coord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
 	stdout := rgEventLine(t, "match", "/tmp/root/demo.kt", "prefix:Needle:suffix\n", 7, 7)
-	roots := map[string]resolve.Coord{"/tmp/root": coord}
+	roots := map[string]resolve.SourceJar{"/tmp/root": {Coord: coord, Path: "/tmp/demo-sources.jar"}}
 
-	matches := parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
-		return mapToCoord(roots, filePath)
+	matches := parseRgOutput(stdout, func(filePath string) (resolve.SourceJar, string, bool) {
+		return mapToSource(roots, filePath)
 	})
 	if len(matches.Matches) != 1 {
 		t.Fatalf("expected 1 match, got %d", len(matches.Matches))
@@ -102,10 +102,10 @@ func TestRunTreatsExitCodeOneAsNoMatches(t *testing.T) {
 func TestParseRgOutputMapsFileIDs(t *testing.T) {
 	coord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
 	stdout := rgEventLine(t, "match", "/tmp/root/demo.kt", "match\n", 7, 1)
-	roots := map[string]resolve.Coord{"/tmp/root": coord}
+	roots := map[string]resolve.SourceJar{"/tmp/root": {Coord: coord, Path: "/tmp/demo-sources.jar"}}
 
-	matches := parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
-		return mapToCoord(roots, filePath)
+	matches := parseRgOutput(stdout, func(filePath string) (resolve.SourceJar, string, bool) {
+		return mapToSource(roots, filePath)
 	})
 	if len(matches.Matches) != 1 {
 		t.Fatalf("expected 1 match, got %d", len(matches.Matches))

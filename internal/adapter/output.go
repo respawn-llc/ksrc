@@ -19,6 +19,17 @@ func FormatRGArgs(plan search.ExecPlan) string {
 	return strings.Join(args, " ")
 }
 
+func WriteRGCommandReport(w io.Writer, plan search.ExecPlan) error {
+	if w == nil {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "VERBOSE: rg: %s %s\n", plan.Cmd, FormatRGArgs(plan)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprintf(w, "VERBOSE: rg jars: %d (mode=%s)\n", plan.JarCount, plan.Mode)
+	return err
+}
+
 func WriteSearchMatches(w io.Writer, matches []search.Match, showExtractedPath bool) error {
 	for _, match := range matches {
 		if showExtractedPath {

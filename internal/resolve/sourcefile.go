@@ -9,7 +9,7 @@ func FindFileInSources(sources []SourceJar, inner string) (SourceJar, string, bo
 		return SourceJar{}, "", false
 	}
 	for _, src := range sources {
-		if _, err := cat.ReadFileFromZip(src.Path, inner, nil); err == nil {
+		if ok, err := cat.HasFileInZip(src.Path, inner); err == nil && ok {
 			return src, inner, true
 		}
 	}

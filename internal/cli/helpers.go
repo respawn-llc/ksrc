@@ -108,16 +108,3 @@ func emitDiagnostics(cmd stderrWriter, meta resolution.ResolveMeta, verbose bool
 type stderrWriter interface {
 	ErrOrStderr() io.Writer
 }
-
-func emitVerbose(cmd stderrWriter, verbose bool, lines ...string) {
-	if !verbose {
-		return
-	}
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "VERBOSE: %s\n", line)
-	}
-}

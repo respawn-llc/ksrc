@@ -49,6 +49,29 @@ func parsePositive(s string) (int, error) {
 
 var lineRangeRe = regexp.MustCompile(`^\s*(\d+)\s*(?:,|:|-|\.{2}|;|\s)\s*(\d+)\s*$`)
 
+func normalizeArchivePath(path string) string {
+	path = strings.ReplaceAll(path, "\\", "/")
+	return strings.TrimPrefix(path, "/")
+}
+
+// HasFileInZip reports whether a zip/jar contains the requested inner path.
+// It only inspects directory metadata and never opens the entry body.
+func HasFileInZip(zipPath, innerPath string) (bool, error) {
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return false, err
+	}
+	defer zr.Close()
+
+	innerPath = normalizeArchivePath(innerPath)
+	for _, f := range zr.File {
+		if f.Name == innerPath {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // ReadFileFromZip reads a file from a zip/jar and optionally slices by line range.
 func ReadFileFromZip(zipPath, innerPath string, lr *LineRange) ([]byte, error) {
 	zr, err := zip.OpenReader(zipPath)
@@ -57,7 +80,7 @@ func ReadFileFromZip(zipPath, innerPath string, lr *LineRange) ([]byte, error) {
 	}
 	defer zr.Close()
 
-	innerPath = strings.TrimPrefix(innerPath, "/")
+	innerPath = normalizeArchivePath(innerPath)
 	for _, f := range zr.File {
 		if f.Name != innerPath {
 			continue
