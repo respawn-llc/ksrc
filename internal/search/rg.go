@@ -253,11 +253,8 @@ var extractCacheLocks sync.Map
 var userCacheDir = os.UserCacheDir
 
 func extractJarCached(src string) (string, error) {
-	cacheRoot, err := searchExtractCacheRoot()
+	cacheRoot, err := prepareExtractCacheRoot()
 	if err != nil {
-		return "", err
-	}
-	if err := os.MkdirAll(cacheRoot, 0o755); err != nil {
 		return "", err
 	}
 	cacheKey, err := extractCacheKey(src)
@@ -305,6 +302,35 @@ func extractJarCached(src string) (string, error) {
 	return dir, nil
 }
 
+func prepareExtractCacheRoot() (string, error) {
+	preferred, err := searchExtractCacheRoot()
+	if err != nil {
+		return "", err
+	}
+	if err := ensureWritableExtractCacheRoot(preferred); err == nil {
+		return preferred, nil
+	} else if fallback := tempExtractCacheRoot(); filepath.Clean(preferred) != filepath.Clean(fallback) {
+		if fallbackErr := ensureWritableExtractCacheRoot(fallback); fallbackErr == nil {
+			return fallback, nil
+		} else {
+			return "", fmt.Errorf("prepare extract cache root %q: %w; fallback %q: %v", preferred, err, fallback, fallbackErr)
+		}
+	} else {
+		return "", err
+	}
+}
+
+func ensureWritableExtractCacheRoot(root string) error {
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return err
+	}
+	probeDir, err := os.MkdirTemp(root, ".ksrc-probe-")
+	if err != nil {
+		return err
+	}
+	return os.RemoveAll(probeDir)
+}
+
 func searchExtractCacheRoot() (string, error) {
 	if dir := strings.TrimSpace(os.Getenv(extractCacheDirEnv)); dir != "" {
 		abs, err := filepath.Abs(dir)
@@ -315,9 +341,13 @@ func searchExtractCacheRoot() (string, error) {
 	}
 	base, err := userCacheDir()
 	if err != nil {
-		return filepath.Join(os.TempDir(), extractCacheRootName), nil
+		return tempExtractCacheRoot(), nil
 	}
 	return filepath.Join(base, extractCacheRootName), nil
+}
+
+func tempExtractCacheRoot() string {
+	return filepath.Join(os.TempDir(), extractCacheRootName)
 }
 
 func extractCacheKey(src string) (string, error) {
