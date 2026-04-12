@@ -1,6 +1,7 @@
 package gradle
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -41,6 +42,99 @@ type selectorProbeInput struct {
 type selectorProbeOutput struct {
 	Selector []bool `json:"selector"`
 	Glob     []bool `json:"glob"`
+}
+
+func TestInitScriptTemplateIsVersionedAndParameterized(t *testing.T) {
+	t.Parallel()
+
+	if initScriptTemplateVersion != "v1" {
+		t.Fatalf("unexpected init script template version: %q", initScriptTemplateVersion)
+	}
+	checks := []string{
+		"{{ .SelectorHelpers }}",
+		"root.tasks.register('ksrcSources')",
+		"gradle.settingsEvaluated { settings ->",
+	}
+	for _, check := range checks {
+		if !strings.Contains(initScriptTemplateSource, check) {
+			t.Fatalf("expected init script template source to contain %q", check)
+		}
+	}
+}
+
+func TestInitScriptTemplateRejectsMissingSelectorHelpers(t *testing.T) {
+	t.Parallel()
+
+	var rendered bytes.Buffer
+	err := initScriptTemplate.Execute(&rendered, map[string]string{})
+	if err == nil {
+		t.Fatal("expected init script template execution to fail for missing SelectorHelpers")
+	}
+	if !strings.Contains(err.Error(), "SelectorHelpers") {
+		t.Fatalf("expected missing-key error to mention SelectorHelpers, got %v", err)
+	}
+}
+
+func TestInitScriptMatchesGolden(t *testing.T) {
+	t.Parallel()
+
+	want, err := os.ReadFile(filepath.Join("testdata", "init_script.v1.golden.gradle"))
+	if err != nil {
+		t.Fatalf("read init script golden: %v", err)
+	}
+	got := InitScript()
+	if got != string(want) {
+		t.Fatalf("rendered init script mismatch: %s", firstLineDiff(string(want), got))
+	}
+}
+
+func TestRenderInitScriptInjectsSelectorHelpers(t *testing.T) {
+	t.Parallel()
+
+	const sentinel = "def __selectorHelperSentinel = true"
+	script, err := renderInitScript(initScriptTemplateData{SelectorHelpers: sentinel})
+	if err != nil {
+		t.Fatalf("render init script: %v", err)
+	}
+	if strings.Contains(script, "{{ .SelectorHelpers }}") {
+		t.Fatal("expected rendered init script to replace selector helper placeholder")
+	}
+	if count := strings.Count(script, sentinel); count != 1 {
+		t.Fatalf("selector helper sentinel count = %d, want 1", count)
+	}
+	checks := []string{
+		"import org.gradle.api.artifacts.component.ModuleComponentIdentifier",
+		"root.tasks.register('ksrcSources')",
+		"gradle.settingsEvaluated { settings ->",
+	}
+	for _, check := range checks {
+		if !strings.Contains(script, check) {
+			t.Fatalf("expected rendered init script to contain %q", check)
+		}
+	}
+}
+
+func firstLineDiff(want string, got string) string {
+	wantLines := strings.Split(want, "\n")
+	gotLines := strings.Split(got, "\n")
+	maxLines := len(wantLines)
+	if len(gotLines) > maxLines {
+		maxLines = len(gotLines)
+	}
+	for i := range maxLines {
+		var wantLine string
+		if i < len(wantLines) {
+			wantLine = wantLines[i]
+		}
+		var gotLine string
+		if i < len(gotLines) {
+			gotLine = gotLines[i]
+		}
+		if wantLine != gotLine {
+			return fmt.Sprintf("first diff at line %d\nwant: %q\ngot:  %q", i+1, wantLine, gotLine)
+		}
+	}
+	return fmt.Sprintf("different lengths: want=%d got=%d", len(want), len(got))
 }
 
 func TestInitScriptUsesSharedSelectorHelpers(t *testing.T) {
