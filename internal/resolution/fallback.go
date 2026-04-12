@@ -50,7 +50,7 @@ func applyCacheFallbackPolicy(plan resolutionPlan, execution gradleExecution) ca
 
 func cacheFallbackCoord(plan resolutionPlan, execution gradleExecution) (resolve.Coord, bool) {
 	resolved := resolve.FilterCoords(execution.LastDeps, plan.Request.Module, plan.Request.Group, plan.Request.Artifact, plan.Request.Version)
-	if len(resolved) == 1 {
+	if len(resolved) > 0 {
 		return resolved[0], true
 	}
 	return resolve.SelectorToCoord(plan.Request.Module, plan.Request.Group, plan.Request.Artifact, plan.Request.Version)
@@ -90,7 +90,10 @@ func cacheFallbackSources(req Request, dep string, applyFilters bool) ([]resolve
 	case req.All || !hasExactSelector(req):
 		sources, err = resolve.FindAllCachedSources()
 	default:
-		coord, _ := resolve.SelectorToCoord(req.Module, req.Group, req.Artifact, req.Version)
+		coord, ok := resolve.SelectorToCoord(req.Module, req.Group, req.Artifact, req.Version)
+		if !ok {
+			return nil, nil, fmt.Errorf("cache fallback requires a concrete selector")
+		}
 		sources, err = resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
 	}
 	if err != nil {

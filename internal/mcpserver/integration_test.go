@@ -413,6 +413,7 @@ func startTestSessionAt(t *testing.T, root string, workDir string, jarPath strin
 	session, err := client.Connect(ctx, &mcp.IOTransport{Reader: stdout, Writer: stdin}, nil)
 	if err != nil {
 		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
 		cancel()
 		t.Fatalf("connect mcp: %v", err)
 	}

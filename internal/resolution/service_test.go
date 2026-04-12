@@ -161,6 +161,59 @@ func TestResolveSourcesUsesConcreteLastDepForSelectorCacheFallback(t *testing.T)
 	}
 }
 
+func TestResolveSourcesPrefersFirstMatchingLastDepForSelectorCacheFallback(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	cacheDirA := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
+	if err := os.MkdirAll(cacheDirA, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir A: %v", err)
+	}
+	jarA := filepath.Join(cacheDirA, "demo-1.0.0-sources.jar")
+	if err := os.WriteFile(jarA, []byte{}, 0o644); err != nil {
+		t.Fatalf("write jar A: %v", err)
+	}
+
+	cacheDirB := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo-jvm", "1.0.0", "hash")
+	if err := os.MkdirAll(cacheDirB, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir B: %v", err)
+	}
+	jarB := filepath.Join(cacheDirB, "demo-jvm-1.0.0-sources.jar")
+	if err := os.WriteFile(jarB, []byte{}, 0o644); err != nil {
+		t.Fatalf("write jar B: %v", err)
+	}
+
+	runner := &scriptedRunner{
+		results: []runResult{{
+			stdout: gradleRecordLine(t, gradleRecord{Type: "dep", Group: "com.example", Artifact: "demo", Version: "1.0.0"}) +
+				gradleRecordLine(t, gradleRecord{Type: "dep", Group: "com.example", Artifact: "demo-jvm", Version: "1.0.0"}),
+		}},
+	}
+
+	service := Service{Runner: runner}
+	result, err := service.ResolveSources(context.Background(), Request{
+		Project:            ".",
+		Module:             "com.example:demo",
+		Config:             "compileClasspath",
+		ApplyFilters:       true,
+		AllowCacheFallback: true,
+	})
+	if err != nil {
+		t.Fatalf("ResolveSources error: %v", err)
+	}
+	if len(result.Sources) != 1 || result.Sources[0].Path != jarA {
+		t.Fatalf("expected first matching last-dep source %q, got %+v", jarA, result.Sources)
+	}
+	if len(result.Deps) != 2 {
+		t.Fatalf("expected both deps preserved, got %+v", result.Deps)
+	}
+	if result.Deps[0].String() != "com.example:demo:1.0.0" || result.Deps[1].String() != "com.example:demo-jvm:1.0.0" {
+		t.Fatalf("unexpected dep order: %+v", result.Deps)
+	}
+	_ = jarB
+}
+
 func TestResolveSourcesExhaustedAttemptsUseExactSelectorCacheFallback(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
