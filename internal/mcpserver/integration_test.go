@@ -15,6 +15,11 @@ import (
 	"github.com/respawn-app/ksrc/internal/cat"
 )
 
+type toolSession interface {
+	CallTool(context.Context, *mcp.CallToolParams) (*mcp.CallToolResult, error)
+	Close() error
+}
+
 func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 	if _, err := exec.LookPath("rg"); err != nil {
 		t.Skip("rg not available")
@@ -36,41 +41,8 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 		t.Fatalf("jar missing test file: %v", err)
 	}
 
-	binPath := filepath.Join(t.TempDir(), "ksrc")
-	buildCmd := exec.Command("go", "build", "-o", binPath, "./cmd/ksrc")
-	buildCmd.Dir = root
-	buildOut, err := buildCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("build ksrc: %v\n%s", err, string(buildOut))
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, binPath, "mcp")
-	cmd.Dir = projectDir
-	cmd.Env = append(os.Environ(), "KSRC_TEST_JAR="+jarPath)
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		t.Fatalf("stdin pipe: %v", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatalf("stdout pipe: %v", err)
-	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("start mcp: %v", err)
-	}
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "client", Version: "v0.0.1"}, nil)
-	session, err := client.Connect(ctx, &mcp.IOTransport{Reader: stdout, Writer: stdin}, nil)
-	if err != nil {
-		_ = cmd.Process.Kill()
-		t.Fatalf("connect mcp: %v", err)
-	}
+	ctx, session, cleanup := startTestSession(t, root, projectDir, jarPath)
+	defer cleanup()
 
 	searchRes, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "search",
@@ -83,8 +55,6 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 		},
 	})
 	if err != nil {
-		_ = session.Close()
-		_ = cmd.Process.Kill()
 		t.Fatalf("search tool: %v", err)
 	}
 	searchText := textFromResult(searchRes)
@@ -92,7 +62,63 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 	if !strings.Contains(searchText, expectedFileID) {
 		t.Fatalf("unexpected search output: %s", searchText)
 	}
-	fileID := expectedFileID
+
+	catRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cat",
+		Arguments: map[string]any{
+			"fileId": expectedFileID,
+			"lines":  "2,2",
+		},
+	})
+	if err != nil {
+		t.Fatalf("cat tool: %v", err)
+	}
+	catText := strings.TrimSpace(textFromResult(catRes))
+	if catText != "public class LocalDate" {
+		t.Fatalf("unexpected cat output: %q", catText)
+	}
+}
+
+func TestMCPServerWherePathEmitsFullyQualifiedFileID(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root := filepath.Clean(filepath.Join(wd, "..", ".."))
+	projectDir := filepath.Join(root, "testdata", "fixture")
+	jarPath := filepath.Join(t.TempDir(), "kotlinx-datetime-sources.jar")
+	inner := "kotlinx/datetime/LocalDate.kt"
+
+	if err := writeZipFile(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	ctx, session, cleanup := startTestSession(t, root, projectDir, jarPath)
+	defer cleanup()
+
+	whereRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "where",
+		Arguments: map[string]any{
+			"pathOrCoord": inner,
+			"group":       "org.jetbrains.kotlinx",
+			"artifact":    "kotlinx-datetime",
+			"project":     projectDir,
+			"subprojects": []string{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("where tool: %v", err)
+	}
+	whereText := textFromResult(whereRes)
+	want := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/" + inner + "|" + jarPath + "\n"
+	if whereText != want {
+		t.Fatalf("unexpected where output:\nwant: %q\n got: %q", want, whereText)
+	}
+
+	fileID, _, ok := strings.Cut(strings.TrimSpace(whereText), "|")
+	if !ok {
+		t.Fatalf("missing file-id separator in output: %q", whereText)
+	}
 
 	catRes, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name: "cat",
@@ -102,20 +128,63 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 		},
 	})
 	if err != nil {
-		_ = session.Close()
-		_ = cmd.Process.Kill()
 		t.Fatalf("cat tool: %v", err)
 	}
 	catText := strings.TrimSpace(textFromResult(catRes))
 	if catText != "public class LocalDate" {
 		t.Fatalf("unexpected cat output: %q", catText)
 	}
+}
 
-	_ = session.Close()
-	_ = stdin.Close()
-	_ = stdout.Close()
-	_ = cmd.Wait()
-	_ = stderr
+func startTestSession(t *testing.T, root string, projectDir string, jarPath string) (context.Context, toolSession, func()) {
+	t.Helper()
+
+	binPath := filepath.Join(t.TempDir(), "ksrc")
+	buildCmd := exec.Command("go", "build", "-o", binPath, "./cmd/ksrc")
+	buildCmd.Dir = root
+	buildOut, err := buildCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build ksrc: %v\n%s", err, string(buildOut))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	cmd := exec.CommandContext(ctx, binPath, "mcp", "--tools=all")
+	cmd.Dir = projectDir
+	cmd.Env = append(os.Environ(), "KSRC_TEST_JAR="+jarPath)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		cancel()
+		t.Fatalf("stdin pipe: %v", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		cancel()
+		t.Fatalf("stdout pipe: %v", err)
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Start(); err != nil {
+		cancel()
+		t.Fatalf("start mcp: %v", err)
+	}
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "client", Version: "v0.0.1"}, nil)
+	session, err := client.Connect(ctx, &mcp.IOTransport{Reader: stdout, Writer: stdin}, nil)
+	if err != nil {
+		_ = cmd.Process.Kill()
+		cancel()
+		t.Fatalf("connect mcp: %v", err)
+	}
+
+	cleanup := func() {
+		_ = session.Close()
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = cmd.Wait()
+		cancel()
+	}
+	return ctx, session, cleanup
 }
 
 func textFromResult(res *mcp.CallToolResult) string {

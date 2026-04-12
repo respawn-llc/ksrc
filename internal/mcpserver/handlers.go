@@ -60,7 +60,7 @@ func registerTools(server *mcp.Server, state *toolState, tools ToolSet) {
 	if tools.Enabled(ToolWhere) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolWhere),
-			Description: "Locate cached source artifact or file and return its full path. Use when diagnosing missing sources or when you want to manually operate on the source file.",
+			Description: "Locate cached source artifact or file and return `<coord>|<jar-path>` or `<file-id>|<jar-path>`. For path lookups, the emitted file-id is reusable with `cat`.",
 			InputSchema: mustInputSchema[WhereInput](),
 		}, state.handleWhere)
 	}
@@ -424,7 +424,7 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 		if err != nil {
 			return toolError(err), nil
 		}
-		return textResult(fmt.Sprintf("%s|%s\n", coord.String()+"!/"+inner, jarPath)), nil
+		return textResult(fmt.Sprintf("%s|%s\n", resolve.FormatFileID(coord, inner), jarPath)), nil
 	}
 	if coord, err := resolve.ParseCoord(arg); err == nil {
 		dep := ""
@@ -494,11 +494,11 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 	if len(result.Sources) == 0 {
 		return toolError(noSourcesError(group, artifact, version)), nil
 	}
-	jarPath, coord, inner, err := findFileInJars(result.Sources, path)
-	if err != nil {
-		return toolError(err), nil
+	source, inner, ok := resolve.FindFileInSources(result.Sources, path)
+	if !ok {
+		return toolError(fmt.Errorf("file not found in resolved sources: %s. Try specifying: `project` (for monorepos), `scope` for build time deps etc., or `configs` for non-standard compilations.", strings.TrimPrefix(path, "/"))), nil
 	}
-	return textResult(fmt.Sprintf("%s|%s\n", coord.String()+"!/"+inner, jarPath)), nil
+	return textResult(fmt.Sprintf("%s|%s\n", resolve.FormatFileID(source.Coord, inner), source.Path)), nil
 }
 
 func textResult(text string) *mcp.CallToolResult {
@@ -538,16 +538,6 @@ func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, e
 		}
 	}
 	return "", fmt.Errorf("source jar not found for %s. Try: calling `fetch` tool, or if you don't see it, ask the user to enable with `ksrc mcp --tools=all`", coord.String())
-}
-
-func findFileInJars(sources []resolve.SourceJar, inner string) (string, resolve.Coord, string, error) {
-	inner = strings.TrimPrefix(inner, "/")
-	for _, src := range sources {
-		if _, err := cat.ReadFileFromZip(src.Path, inner, nil); err == nil {
-			return src.Path, src.Coord, inner, nil
-		}
-	}
-	return "", resolve.Coord{}, "", fmt.Errorf("file not found in resolved sources: %s. Try specifying: `project` (for monorepos), `scope` for build time deps etc., or `configs` for non-standard compilations.", inner)
 }
 
 func formatRgArgs(plan search.ExecPlan) string {

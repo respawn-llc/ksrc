@@ -52,7 +52,7 @@ func newOpenCmd(app *App) *cobra.Command {
 				}
 			} else {
 				if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
-					return fmt.Errorf("path requires --module or a file-id. Try: ksrc open <file-id> or ksrc open --module group:artifact[:version] <path>")
+					return fmt.Errorf("path requires --module, or --group plus --artifact, or a file-id. Try: ksrc open <file-id> or ksrc open --module group:artifact[:version] <path>")
 				}
 				sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
 				if err != nil {
@@ -62,11 +62,11 @@ func newOpenCmd(app *App) *cobra.Command {
 				if len(sources) == 0 {
 					return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 				}
-				jarPath, inner, err := findFileInJars(sources, arg)
-				if err != nil {
-					return err
+				source, inner, ok := resolve.FindFileInSources(sources, arg)
+				if !ok {
+					return fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id", strings.TrimPrefix(arg, "/"))
 				}
-				data, err = cat.ReadFileFromZip(jarPath, inner, lr)
+				data, err = cat.ReadFileFromZip(source.Path, inner, lr)
 				if err != nil {
 					return err
 				}

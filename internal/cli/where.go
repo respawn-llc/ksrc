@@ -33,7 +33,7 @@ func newWhereCmd(app *App) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", coord.String()+"!/"+inner, jarPath)
+				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", resolve.FormatFileID(coord, inner), jarPath)
 				return nil
 			}
 
@@ -61,7 +61,7 @@ func newWhereCmd(app *App) *cobra.Command {
 			}
 
 			if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
-				return fmt.Errorf("path requires --module or a file-id")
+				return fmt.Errorf("path requires --module, or --group plus --artifact, or a file-id")
 			}
 
 			sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
@@ -72,11 +72,11 @@ func newWhereCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			jarPath, inner, err := findFileInJars(sources, arg)
-			if err != nil {
-				return err
+			source, inner, ok := resolve.FindFileInSources(sources, arg)
+			if !ok {
+				return fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id", strings.TrimPrefix(arg, "/"))
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", flags.Module+"!/"+inner, jarPath)
+			fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", resolve.FormatFileID(source.Coord, inner), source.Path)
 			return nil
 		},
 	}
