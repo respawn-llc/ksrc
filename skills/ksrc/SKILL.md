@@ -37,6 +37,9 @@ Parsing rule:
 - Parse first two `:`-delimited decimal fields as `<line>` and `<col>`.
 - Treat remainder verbatim as `<line-text>`; it may contain `:`.
 
+With `--show-extracted-path`, output shape changes to:
+`<file-id>\t<quoted-extracted-path>\t<line>\t<col>\t<quoted-line-text>`
+
 Common flags:
 - `--all` search across all resolved deps (default, slow)
 - `--project <path>` project root (default `.`)

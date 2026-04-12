@@ -71,6 +71,7 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - `internal/search` invokes `rg --json` and decodes typed `match`/`context` events instead of parsing human-oriented `path:line:col:text` output.
 - `internal/gradle` init script emits `KSRCJSON\t<json>` records for deps, source jars, and included builds; the Go side ignores all non-prefixed Gradle log lines.
 - External `ksrc search` output remains plaintext: `<file-id> <line>:<col>:<line-text>`. `<line-text>` is raw line content with trailing newline stripped and may contain literal `:`.
+- Optional debug output for `ksrc search --show-extracted-path` uses tab-delimited quoted fields: `<file-id>\t<quoted-extracted-path>\t<line>\t<col>\t<quoted-line-text>`.
 
 ## 2026-04-12: Search always extracts into a persistent cache
 - `rg --search-zip` cannot provide stable archive-entry provenance for `<file-id>` mapping, so search no longer uses it.
