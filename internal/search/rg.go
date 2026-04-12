@@ -3,11 +3,13 @@ package search
 import (
 	"archive/zip"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -54,66 +56,86 @@ func Run(ctx context.Context, runner executil.Runner, opts Options) ([]Match, er
 	return strategy.run(ctx, runner, opts)
 }
 
+type rgText struct {
+	Text  *string `json:"text,omitempty"`
+	Bytes *string `json:"bytes,omitempty"`
+}
+
+func (v rgText) decode() (string, bool) {
+	if v.Text != nil {
+		return *v.Text, true
+	}
+	if v.Bytes != nil {
+		decoded, err := base64.StdEncoding.DecodeString(*v.Bytes)
+		if err != nil {
+			return "", false
+		}
+		return string(decoded), true
+	}
+	return "", false
+}
+
+type rgSubmatch struct {
+	Start int `json:"start"`
+}
+
+type rgEventType string
+
+const (
+	rgEventMatch   rgEventType = "match"
+	rgEventContext rgEventType = "context"
+)
+
+type rgMessage struct {
+	Type rgEventType `json:"type"`
+	Data struct {
+		Path       rgText       `json:"path"`
+		Lines      rgText       `json:"lines"`
+		LineNumber int          `json:"line_number"`
+		Submatches []rgSubmatch `json:"submatches"`
+	} `json:"data"`
+}
+
 func parseRgLine(line string) (Match, bool) {
-	if m, ok := parseRgMatchLine(line); ok {
-		return m, true
-	}
-	return parseRgContextLine(line)
-}
-
-func parseRgMatchLine(line string) (Match, bool) {
-	// file:line:col:match
-	last := strings.LastIndex(line, ":")
-	if last <= 0 {
+	var msg rgMessage
+	if err := json.Unmarshal([]byte(line), &msg); err != nil {
 		return Match{}, false
 	}
-	second := strings.LastIndex(line[:last], ":")
-	if second <= 0 {
+	if msg.Type != rgEventMatch && msg.Type != rgEventContext {
 		return Match{}, false
 	}
-	third := strings.LastIndex(line[:second], ":")
-	if third <= 0 {
+	file, ok := msg.Data.Path.decode()
+	if !ok || file == "" || msg.Data.LineNumber <= 0 {
 		return Match{}, false
 	}
-	file := line[:third]
-	lineStr := line[third+1 : second]
-	colStr := line[second+1 : last]
-	text := line[last+1:]
-	ln, err := strconv.Atoi(lineStr)
-	if err != nil {
+	text, ok := msg.Data.Lines.decode()
+	if !ok {
 		return Match{}, false
 	}
-	col, err := strconv.Atoi(colStr)
-	if err != nil {
-		return Match{}, false
+	match := Match{
+		File:   file,
+		Line:   msg.Data.LineNumber,
+		Column: 0,
+		Text:   strings.TrimRight(text, "\r\n"),
 	}
-	return Match{File: file, Line: ln, Column: col, Text: text}, true
-}
-
-func parseRgContextLine(line string) (Match, bool) {
-	// file-line-text (rg -C with --no-heading --line-number --column)
-	last := strings.LastIndex(line, "-")
-	if last <= 0 {
-		return Match{}, false
+	if msg.Type == rgEventMatch && len(msg.Data.Submatches) > 0 {
+		match.Column = msg.Data.Submatches[0].Start + 1
 	}
-	second := strings.LastIndex(line[:last], "-")
-	if second <= 0 {
-		return Match{}, false
-	}
-	file := line[:second]
-	lineStr := line[second+1 : last]
-	text := line[last+1:]
-	ln, err := strconv.Atoi(lineStr)
-	if err != nil {
-		return Match{}, false
-	}
-	return Match{File: file, Line: ln, Column: 0, Text: text}, true
+	return match, true
 }
 
 type coordMapper func(string) (resolve.Coord, string, bool)
 
-func parseRgOutput(stdout string, mapper coordMapper) []Match {
+type rgParseResult struct {
+	Matches []Match
+	Parsed  int
+	Mapped  int
+}
+
+func parseRgOutput(stdout string, mapper coordMapper) rgParseResult {
 	matches := []Match{}
+	parsed := 0
+	mapped := 0
 	for _, line := range strings.Split(stdout, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -123,14 +145,16 @@ func parseRgOutput(stdout string, mapper coordMapper) []Match {
 		if !ok {
 			continue
 		}
+		parsed++
 		coord, inner, ok := mapper(m.File)
 		if !ok {
 			continue
 		}
-		m.FileID = coord.String() + "!/" + inner
+		mapped++
+		m.FileID = resolve.FormatFileID(coord, inner)
 		matches = append(matches, m)
 	}
-	return matches
+	return rgParseResult{Matches: matches, Parsed: parsed, Mapped: mapped}
 }
 
 func mapToCoord(roots map[string]resolve.Coord, filePath string) (resolve.Coord, string, bool) {
@@ -145,88 +169,33 @@ func mapToCoord(roots map[string]resolve.Coord, filePath string) (resolve.Coord,
 	return resolve.Coord{}, "", false
 }
 
-func mapToCoordFromJarPath(jarPaths map[string]resolve.Coord, filePath string) (resolve.Coord, string, bool) {
-	for jar, coord := range jarPaths {
-		prefix := jar + ":"
-		if !strings.HasPrefix(filePath, prefix) {
-			continue
-		}
-		inner := strings.TrimPrefix(filePath, prefix)
-		inner = strings.TrimPrefix(inner, "/")
-		return coord, inner, true
-	}
-	return resolve.Coord{}, "", false
-}
-
 type searchStrategy struct {
 	mode string
 	run  func(context.Context, executil.Runner, Options) ([]Match, error)
 }
 
-func selectStrategy(ctx context.Context, runner executil.Runner) searchStrategy {
-	if supportsZipSearch(ctx, runner) {
-		return searchStrategy{mode: "zip", run: runZipSearch}
-	}
+func selectStrategy(context.Context, executil.Runner) searchStrategy {
 	return searchStrategy{mode: "extract", run: runExtractSearch}
 }
 
-func runZipSearch(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
-	jarPaths := make(map[string]resolve.Coord, len(opts.Jars))
-	searchJars := make([]string, 0, len(opts.Jars))
-	for _, j := range opts.Jars {
-		jarPaths[j.Path] = j.Coord
-		searchJars = append(searchJars, j.Path)
-	}
-
-	args := []string{"--search-zip", "--no-heading", "--line-number", "--column", "--color=never", "--with-filename"}
-	args = append(args, opts.RGArgs...)
-	args = append(args, "--")
-	args = append(args, opts.Pattern)
-	args = append(args, searchJars...)
-
-	if opts.Report != nil {
-		opts.Report(ExecPlan{
-			Cmd:      "rg",
-			Args:     args,
-			JarCount: len(opts.Jars),
-			Mode:     "zip",
-			WorkDir:  opts.WorkDir,
-		})
-	}
-	stdout, stderr, err := runner.Run(ctx, opts.WorkDir, "rg", args...)
-	if err != nil {
-		if isNoMatches(err) {
-			return nil, nil
-		}
-		if strings.TrimSpace(stdout) == "" {
-			return nil, fmt.Errorf("rg failed: %w\n%s", err, strings.TrimSpace(stderr))
-		}
-	}
-
-	return parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
-		return mapToCoordFromJarPath(jarPaths, filePath)
-	}), nil
-}
-
 func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
-	root, err := os.MkdirTemp("", "ksrc-search-")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(root)
-
 	extractRoots := make(map[string]resolve.Coord)
 	searchDirs := make([]string, 0, len(opts.Jars))
-	for i, j := range opts.Jars {
-		dir := filepath.Join(root, fmt.Sprintf("jar-%d", i))
-		if err := extractJar(j.Path, dir); err != nil {
+	seenDirs := make(map[string]struct{}, len(opts.Jars))
+	for _, j := range opts.Jars {
+		dir, err := extractJarCached(j.Path)
+		if err != nil {
 			return nil, err
 		}
 		extractRoots[dir] = j.Coord
+		if _, ok := seenDirs[dir]; ok {
+			continue
+		}
+		seenDirs[dir] = struct{}{}
 		searchDirs = append(searchDirs, dir)
 	}
 
-	args := []string{"--no-heading", "--line-number", "--column", "--color=never", "--with-filename"}
+	args := []string{"--json", "--color=never"}
 	args = append(args, opts.RGArgs...)
 	args = append(args, "--")
 	args = append(args, opts.Pattern)
@@ -251,9 +220,10 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 		}
 	}
 
-	return parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
+	parsed := parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
 		return mapToCoord(extractRoots, filePath)
-	}), nil
+	})
+	return parsed.Matches, nil
 }
 
 type exitCoder interface {
@@ -270,58 +240,101 @@ func isNoMatches(err error) bool {
 	return false
 }
 
-var zipSupport = &zipSupportCache{}
+const (
+	extractCacheDirEnv   = "KSRC_EXTRACT_CACHE_DIR"
+	extractCacheReady    = ".ksrc-ready"
+	extractCacheRootName = "ksrc/search-extracted-v1"
+)
 
-type zipSupportCache struct {
-	once      sync.Once
-	supported bool
-}
+var extractCacheLocks sync.Map
 
-func (c *zipSupportCache) supports(ctx context.Context, runner executil.Runner) bool {
-	c.once.Do(func() {
-		c.supported = probeZipSearch(ctx, runner)
-	})
-	return c.supported
-}
-
-func supportsZipSearch(ctx context.Context, runner executil.Runner) bool {
-	return zipSupport.supports(ctx, runner)
-}
-
-func resetZipSupportCacheForTests() {
-	zipSupport = &zipSupportCache{}
-}
-
-func probeZipSearch(ctx context.Context, runner executil.Runner) bool {
-	file, err := os.CreateTemp("", "ksrc-rg-probe-*.zip")
+func extractJarCached(src string) (string, error) {
+	cacheRoot, err := searchExtractCacheRoot()
 	if err != nil {
-		return false
+		return "", err
 	}
-	path := file.Name()
-	zw := zip.NewWriter(file)
-	w, err := zw.Create("probe.txt")
-	if err == nil {
-		_, _ = w.Write([]byte("ksrc-zip-probe"))
+	if err := os.MkdirAll(cacheRoot, 0o755); err != nil {
+		return "", err
 	}
-	_ = zw.Close()
-	_ = file.Close()
-	defer os.Remove(path)
-
-	args := []string{"--search-zip", "--no-heading", "--line-number", "--column", "--color=never", "-g", "*.txt", "ksrc-zip-probe", path}
-	stdout, _, err := runner.Run(ctx, "", "rg", args...)
+	cacheKey, err := extractCacheKey(src)
 	if err != nil {
-		return false
+		return "", err
 	}
-	for _, line := range strings.Split(stdout, "\n") {
-		m, ok := parseRgLine(strings.TrimSpace(line))
-		if !ok {
-			continue
-		}
-		if strings.HasPrefix(m.File, path+":") {
-			return true
-		}
+	dir := filepath.Join(cacheRoot, cacheKey)
+	if isExtractedJarReady(dir) {
+		return dir, nil
 	}
-	return false
+	lock := extractCacheLock(dir)
+	lock.Lock()
+	defer lock.Unlock()
+	if isExtractedJarReady(dir) {
+		return dir, nil
+	}
+	tempDir, err := os.MkdirTemp(cacheRoot, cacheKey+".tmp-")
+	if err != nil {
+		return "", err
+	}
+	cleanupTemp := func() {
+		_ = os.RemoveAll(tempDir)
+	}
+	if err := extractJar(src, tempDir); err != nil {
+		cleanupTemp()
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(tempDir, extractCacheReady), []byte("ok\n"), 0o644); err != nil {
+		cleanupTemp()
+		return "", err
+	}
+	if err := os.Rename(tempDir, dir); err != nil {
+		if isExtractedJarReady(dir) {
+			cleanupTemp()
+			return dir, nil
+		}
+		if removeErr := os.RemoveAll(dir); removeErr == nil {
+			if retryErr := os.Rename(tempDir, dir); retryErr == nil {
+				return dir, nil
+			}
+		}
+		cleanupTemp()
+		return "", err
+	}
+	return dir, nil
+}
+
+func searchExtractCacheRoot() (string, error) {
+	if dir := strings.TrimSpace(os.Getenv(extractCacheDirEnv)); dir != "" {
+		return filepath.Clean(dir), nil
+	}
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(base, extractCacheRootName), nil
+}
+
+func extractCacheKey(src string) (string, error) {
+	abs, err := filepath.Abs(src)
+	if err != nil {
+		return "", err
+	}
+	// Gradle artifact caches are checksum-addressed, so a canonical path is the
+	// production identity we care about here. This keeps cache lookup at stat-free
+	// path normalization cost instead of re-hashing jar contents on every search.
+	// Tradeoff: if some non-Gradle workflow overwrites a jar in place at the same
+	// path, this cache will intentionally keep reusing the existing extraction.
+	clean := filepath.Clean(abs)
+	sum := sha256.Sum256([]byte(clean))
+	return fmt.Sprintf("%x", sum), nil
+}
+
+func isExtractedJarReady(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, extractCacheReady))
+	return err == nil && !info.IsDir()
+}
+
+func extractCacheLock(key string) *sync.Mutex {
+	lock, _ := extractCacheLocks.LoadOrStore(key, &sync.Mutex{})
+	return lock.(*sync.Mutex)
 }
 
 func extractJar(src, dest string) error {
@@ -335,19 +348,18 @@ func extractJar(src, dest string) error {
 		if f.FileInfo().IsDir() {
 			continue
 		}
-		path := filepath.Join(dest, filepath.FromSlash(f.Name))
-		clean := filepath.Clean(path)
-		if !strings.HasPrefix(clean, dest) {
+		path, err := archiveChildPath(dest, f.Name)
+		if err != nil {
 			return fmt.Errorf("invalid path in archive: %s", f.Name)
 		}
-		if err := os.MkdirAll(filepath.Dir(clean), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
 		rc, err := f.Open()
 		if err != nil {
 			return err
 		}
-		out, err := os.Create(clean)
+		out, err := os.Create(path)
 		if err != nil {
 			_ = rc.Close()
 			return err
@@ -361,4 +373,17 @@ func extractJar(src, dest string) error {
 		_ = rc.Close()
 	}
 	return nil
+}
+
+func archiveChildPath(root, name string) (string, error) {
+	root = filepath.Clean(root)
+	path := filepath.Clean(filepath.Join(root, filepath.FromSlash(name)))
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return "", err
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes root")
+	}
+	return path, nil
 }

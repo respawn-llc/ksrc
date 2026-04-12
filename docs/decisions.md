@@ -59,9 +59,20 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 ## 2026-01-24: Resolution orchestration split
 - CLI delegates resolution to `internal/resolution` to keep command wiring thin.
 - Gradle traversal is separated from invocation/parsing with an injectable resolver for tests.
-- Search strategy selection is separated from rg output parsing; zip capability is cached per process.
+- Search execution is separated from rg output parsing so search backends can evolve without changing CLI formatting.
 
 ## 2026-01-31: MCP tools return plaintext only (no structuredContent)
 - Problem: some MCP harnesses (e.g. Codex) prefer `structuredContent` over `content`. The Go SDK auto-populates `structuredContent` for typed handlers (`ToolHandlerFor`), and when the output type was `struct{}`, it serialized to `{}`. That caused harnesses to ignore the real plaintext output in `content`.
 - Decision: switch MCP tools to untyped handlers (`ToolHandler`) and supply explicit `InputSchema` to keep validation while ensuring we only emit `content` text. Errors are returned as `IsError=true` with a text payload in `content`.
 - Tradeoff: we lose auto-generated output schemas/structured output, but avoid empty `{}` structured payloads and keep cross-harness behavior consistent for plaintext tools.
+
+## 2026-04-12: Internal parsers use machine-readable records
+- `internal/search` invokes `rg --json` and decodes typed `match`/`context` events instead of parsing human-oriented `path:line:col:text` output.
+- `internal/gradle` init script emits `KSRCJSON\t<json>` records for deps, source jars, and included builds; the Go side ignores all non-prefixed Gradle log lines.
+- External `ksrc search` output remains plaintext: `<file-id> <line>:<col>:<line-text>`. `<line-text>` is raw line content with trailing newline stripped and may contain literal `:`.
+
+## 2026-04-12: Search always extracts into a persistent cache
+- `rg --search-zip` cannot provide stable archive-entry provenance for `<file-id>` mapping, so search no longer uses it.
+- `internal/search` extracts source jars into a persistent cache under the user cache dir, keyed by canonical absolute jar path.
+- This intentionally models production Gradle cache behavior, where artifact paths are already checksum-addressed, and avoids extra hashing or metadata churn in the hot search path.
+- `KSRC_EXTRACT_CACHE_DIR` overrides the cache root for tests and local debugging.

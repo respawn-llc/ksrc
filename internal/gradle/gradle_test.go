@@ -2,6 +2,7 @@ package gradle
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -78,7 +79,7 @@ func TestResolveStopsAfterRootSources(t *testing.T) {
 	runner := &scriptedRunner{
 		responses: map[string]runResult{
 			root: {
-				stdout: "KSRC|com.example:demo:1.0.0|/tmp/demo-sources.jar\n",
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
 			},
 		},
 	}
@@ -114,7 +115,7 @@ func TestResolveFallsBackToBuildSrc(t *testing.T) {
 				stdout: "",
 			},
 			buildSrcDir: {
-				stdout: "KSRC|com.example:demo:1.0.0|/tmp/demo-sources.jar\n",
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
 			},
 		},
 	}
@@ -140,10 +141,10 @@ func TestResolveFallsBackToIncludedBuilds(t *testing.T) {
 	runner := &scriptedRunner{
 		responses: map[string]runResult{
 			root: {
-				stdout: "KSRCINCLUDE|" + included + "\n",
+				stdout: outputRecordLine(t, outputRecord{Type: "include", Path: included}),
 			},
 			included: {
-				stdout: "KSRC|com.example:demo:1.0.0|/tmp/demo-sources.jar\n",
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
 			},
 		},
 	}
@@ -190,6 +191,30 @@ func TestResolveIncludedBuildsDedupesAndBfs(t *testing.T) {
 	}
 }
 
+func TestResolveParsesMachineReadableRecordsWithPipesInPath(t *testing.T) {
+	root := t.TempDir()
+	pipePath := filepath.Join(root, "demo|sources.jar")
+	included := filepath.Join(root, "build|one")
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "include", Path: included}) +
+					outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: pipePath}),
+			},
+		},
+	}
+	res, err := Resolve(context.Background(), runner, ResolveOptions{ProjectDir: root, IncludeIncludedBuilds: true})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(res.Sources) != 1 || res.Sources[0].Path != pipePath {
+		t.Fatalf("unexpected sources: %+v", res.Sources)
+	}
+	if len(res.IncludedBuilds) != 1 || res.IncludedBuilds[0] != included {
+		t.Fatalf("unexpected included builds: %+v", res.IncludedBuilds)
+	}
+}
+
 type scriptedRunner struct {
 	responses map[string]runResult
 	calls     []string
@@ -231,4 +256,13 @@ func (s *stubResolver) ResolveOnce(_ context.Context, _ executil.Runner, opts Re
 		return res, nil
 	}
 	return ResolveResult{}, nil
+}
+
+func outputRecordLine(t *testing.T, record outputRecord) string {
+	t.Helper()
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		t.Fatalf("marshal output record: %v", err)
+	}
+	return recordPrefix + string(encoded) + "\n"
 }

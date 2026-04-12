@@ -28,7 +28,12 @@ Give this tool generous timeouts. It can take a few minutes to download sources 
 ### `ksrc search <pattern> [-- <rg-args>]`
 Search dependency sources.
 
-Output format: `<file-id> <line>:<col>:<match>`
+Output format: `<file-id> <line>:<col>:<line-text>`
+
+Parsing rule:
+- Split once on first space to isolate `<file-id>`.
+- Parse first two `:`-delimited decimal fields as `<line>` and `<col>`.
+- Treat remainder verbatim as `<line-text>`; it may contain `:`.
 
 Common flags:
 - `--all` search across all resolved deps (default, slow)

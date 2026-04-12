@@ -2,6 +2,7 @@ package gradle
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,6 +39,42 @@ type ResolveResult struct {
 	IncludedBuilds []string
 	Warnings       []string
 	Verbose        []string
+}
+
+const recordPrefix = "KSRCJSON\t"
+
+type recordType string
+
+const (
+	recordTypeSource  recordType = "source"
+	recordTypeDep     recordType = "dep"
+	recordTypeInclude recordType = "include"
+)
+
+type outputRecord struct {
+	Type     recordType `json:"type"`
+	Group    string     `json:"group,omitempty"`
+	Artifact string     `json:"artifact,omitempty"`
+	Version  string     `json:"version,omitempty"`
+	Path     string     `json:"path,omitempty"`
+}
+
+func (r outputRecord) coord() (resolve.Coord, bool) {
+	if strings.TrimSpace(r.Group) == "" || strings.TrimSpace(r.Artifact) == "" || strings.TrimSpace(r.Version) == "" {
+		return resolve.Coord{}, false
+	}
+	return resolve.Coord{Group: r.Group, Artifact: r.Artifact, Version: r.Version}, true
+}
+
+func parseOutputRecord(line string) (outputRecord, bool) {
+	if !strings.HasPrefix(line, recordPrefix) {
+		return outputRecord{}, false
+	}
+	var record outputRecord
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(line, recordPrefix)), &record); err != nil {
+		return outputRecord{}, false
+	}
+	return record, true
 }
 
 func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOptions) (ResolveResult, error) {
@@ -92,9 +129,18 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 		if line == "" {
 			continue
 		}
-		if strings.HasPrefix(line, "KSRC|") {
-			coord, path, ok := parseLine(line, "KSRC|")
+		record, ok := parseOutputRecord(line)
+		if !ok {
+			continue
+		}
+		switch record.Type {
+		case recordTypeSource:
+			coord, ok := record.coord()
 			if !ok {
+				continue
+			}
+			path := strings.TrimSpace(record.Path)
+			if path == "" {
 				continue
 			}
 			key := coord.String() + "|" + path
@@ -103,17 +149,14 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 			}
 			seen[key] = struct{}{}
 			result.Sources = append(result.Sources, resolve.SourceJar{Coord: coord, Path: path})
-			continue
-		}
-		if strings.HasPrefix(line, "KSRCDEP|") {
-			coord, _, ok := parseLine(line, "KSRCDEP|")
+		case recordTypeDep:
+			coord, ok := record.coord()
 			if !ok {
 				continue
 			}
 			result.Deps = append(result.Deps, coord)
-		}
-		if strings.HasPrefix(line, "KSRCINCLUDE|") {
-			path := strings.TrimSpace(strings.TrimPrefix(line, "KSRCINCLUDE|"))
+		case recordTypeInclude:
+			path := strings.TrimSpace(record.Path)
 			if path == "" {
 				continue
 			}
@@ -250,19 +293,6 @@ func cleanPath(path string) string {
 		return abs
 	}
 	return filepath.Clean(path)
-}
-
-func parseLine(line, prefix string) (resolve.Coord, string, bool) {
-	trim := strings.TrimPrefix(line, prefix)
-	parts := strings.SplitN(trim, "|", 2)
-	coord, err := resolve.ParseCoord(parts[0])
-	if err != nil {
-		return resolve.Coord{}, "", false
-	}
-	if len(parts) == 1 {
-		return coord, "", true
-	}
-	return coord, strings.TrimSpace(parts[1]), true
 }
 
 func formatGradleInvocation(cmd string, args []string, projectDir string, projectPath string) []string {

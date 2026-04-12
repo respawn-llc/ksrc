@@ -1,41 +1,15 @@
 package gradle
 
-const initScript = `
+import (
+	"fmt"
+
+	"github.com/respawn-app/ksrc/internal/resolve"
+)
+
+const initScriptTemplate = `
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-
-def splitCsv = { String value ->
-    if (value == null) return [] as Set
-    value.split(',').collect { it.trim() }.findAll { it }.toSet()
-}
-
-def matchesGlob = { String patterns, String value ->
-    if (patterns == null || patterns.trim().isEmpty()) return true
-    patterns.split(',').collect { it.trim() }.findAll { it }.any { pattern ->
-        def regex = pattern.replace('.', '\\.').replace('*', '.*').replace('?', '.')
-        return value ==~ regex
-    }
-}
-
-def matchesModule = { String selector, String group, String artifact, String version ->
-    if (selector == null || selector.trim().isEmpty()) return true
-    if (selector.contains(':')) {
-        def parts = selector.split(':')
-        if (parts.length >= 2) {
-            if (!matchesGlob(parts[0], group)) return false
-            if (!matchesGlob(parts[1], artifact)) return false
-            if (parts.length >= 3 && parts[2]) return matchesGlob(parts[2], version)
-            return true
-        }
-    }
-    def candidates = [
-        group,
-        artifact,
-        "${group}:${artifact}",
-        artifact.replace('-', '.'),
-        "${group}:${artifact}".replace('-', '.')
-    ]
-    return candidates.any { matchesGlob(selector, it) || it.contains(selector) }
-}
+import groovy.json.JsonOutput
+%s
 
 def isSelectedProject = { String pathOrName, String projectPath, String projectName ->
     if (pathOrName.startsWith(':')) return pathOrName == projectPath
@@ -76,6 +50,9 @@ def scopeProp = props['ksrcScope'] ?: 'compile'
 def depProp = props['ksrcDep']
 def includeBuildscript = (props['ksrcBuildscript'] ?: 'true').toString().toBoolean()
 def includeIncludedBuilds = (props['ksrcIncludeBuilds'] ?: 'true').toString().toBoolean()
+def emitRecord = { Map payload ->
+    println "KSRCJSON\t${JsonOutput.toJson(payload)}"
+}
 
 gradle.rootProject { root ->
 
@@ -93,7 +70,7 @@ gradle.rootProject { root ->
             proj.configurations.each { cfg ->
                 if (!cfg.canBeResolved) return
                 if (!configs.isEmpty()) {
-                    if (configs.any { cfgPattern -> matchesGlob(cfgPattern as String, cfg.name) }) selectedConfigs << cfg
+                    if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) selectedConfigs << cfg
                 } else {
                     if (matchesTargets(cfg.name, targets) && matchesScope(cfg.name, scopeProp as String)) selectedConfigs << cfg
                 }
@@ -118,7 +95,7 @@ gradle.rootProject { root ->
             proj.buildscript.configurations.each { cfg ->
                 if (!cfg.canBeResolved) return
                 if (!configs.isEmpty()) {
-                    if (configs.any { cfgPattern -> matchesGlob(cfgPattern as String, cfg.name) }) buildscriptConfigs << cfg
+                    if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) buildscriptConfigs << cfg
                 } else {
                     buildscriptConfigs << cfg
                 }
@@ -132,14 +109,11 @@ gradle.rootProject { root ->
         }
 
         def filteredIds = moduleIds.findAll { id ->
-            matchesModule(moduleProp as String, id.group, id.module, id.version) &&
-            matchesGlob(groupProp as String, id.group) &&
-            matchesGlob(artifactProp as String, id.module) &&
-            matchesGlob(versionProp as String, id.version)
+            matchesCoordinateSelectors(moduleProp as String, groupProp as String, artifactProp as String, versionProp as String, id.group, id.module, id.version)
         }
 
         filteredIds.each { id ->
-            println "KSRCDEP|${id.group}:${id.module}:${id.version}"
+            emitRecord([type: 'dep', group: id.group, artifact: id.module, version: id.version])
         }
 
         if (filteredIds.isEmpty()) return
@@ -157,7 +131,7 @@ gradle.rootProject { root ->
         def lenient = sourcesCfg.resolvedConfiguration.lenientConfiguration
         lenient.artifacts.each { art ->
             def id = art.moduleVersion.id
-            println "KSRC|${id.group}:${id.name}:${id.version}|${art.file.absolutePath}"
+            emitRecord([type: 'source', group: id.group, artifact: id.name, version: id.version, path: art.file.absolutePath])
         }
     }
 
@@ -204,7 +178,7 @@ gradle.settingsEvaluated { settings ->
                 }
             }
             if (dir != null) {
-                println "KSRCINCLUDE|${dir.absolutePath}"
+                emitRecord([type: 'include', path: dir.absolutePath])
             }
         }
     } catch (Throwable ignored) {
@@ -214,5 +188,5 @@ gradle.settingsEvaluated { settings ->
 `
 
 func InitScript() string {
-	return initScript
+	return fmt.Sprintf(initScriptTemplate, resolve.GradleSelectorHelpers())
 }

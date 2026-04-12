@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -133,7 +134,8 @@ func TestResolveSourcesAllKeepsMergedResultsOnGradleFailure(t *testing.T) {
 	runner := &scriptedRunner{
 		results: []runResult{
 			{
-				stdout: "KSRC|com.example:demo:1.0.0|/tmp/demo-1.0.0-sources.jar\nKSRCDEP|com.example:demo:1.0.0\n",
+				stdout: gradleRecordLine(t, gradleRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-1.0.0-sources.jar"}) +
+					gradleRecordLine(t, gradleRecord{Type: "dep", Group: "com.example", Artifact: "demo", Version: "1.0.0"}),
 			},
 			{
 				stderr: "BUILD FAILED",
@@ -170,4 +172,21 @@ func TestResolveSourcesAllKeepsMergedResultsOnGradleFailure(t *testing.T) {
 	if len(meta.Warnings) == 0 || !strings.Contains(meta.Warnings[0], "Gradle failed") {
 		t.Fatalf("expected Gradle failed warning, got: %v", meta.Warnings)
 	}
+}
+
+type gradleRecord struct {
+	Type     string `json:"type"`
+	Group    string `json:"group,omitempty"`
+	Artifact string `json:"artifact,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Path     string `json:"path,omitempty"`
+}
+
+func gradleRecordLine(t *testing.T, payload gradleRecord) string {
+	t.Helper()
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal gradle record: %v", err)
+	}
+	return "KSRCJSON\t" + string(encoded) + "\n"
 }

@@ -26,15 +26,13 @@ brew install ksrc
 
 ### Standalone binaries via GitHub Releases:
 
+ksrc installed manually does NOT auto-update, unlike ksrc skills and plugins. Please keep the binary up to date too.
+
 Install script (macOS/Linux):
 
 ```
 curl -fsSL https://raw.githubusercontent.com/respawn-app/ksrc/main/scripts/install.sh | sh
 ```
-
-### Manual install: 
-
-Download the appropriate archive for your OS/arch from [releases](https://github.com/respawn-app/ksrc/releases) and place `ksrc` on your `PATH`.
 
 ## 2. Teach agents how to use it
 
@@ -78,7 +76,7 @@ You shouldn't need the skill if you use mcp, but if your agent has access to `ba
 
 ### AGENTS.md prompt
 
-> Avoid directly accessing `.gradle`; instead, proactively use `ksrc` bash tool to inspect source code of dependencies to learn API shapes or implementations. Start with `ksrc --help`.
+> Avoid directly accessing `.gradle`; instead, proactively use `ksrc` cli to inspect source code of dependencies to learn API shapes or implementations. Start with `ksrc --help`.
 
 ## Usage
 
@@ -90,7 +88,7 @@ Give this tool larger timeouts - it can take a minute to download sources (if ne
 $ ksrc search "updateState<"
 pro.respawn.flowmvi:core:3.3.0-alpha03!/commonMain/pro/respawn/flowmvi/api/StateReceiver.kt 19:8: updateState<State.Subtype, _> { }
 ```
-The tool returns found artifacts, versions, source sets, paths, and lines in a single common format that's chainable with other commands, rg-style.
+The tool returns one chainable record per hit in this format: `<file-id> <line>:<col>:<line-text>`. The text segment is the raw source line with its trailing newline stripped, so it may contain literal `:` characters.
 
 If you want faster execution & less noise, specify:
 - `--artifact` to limit search to one artifact, (or `--module` to also limit by version)
@@ -102,6 +100,15 @@ If you want faster execution & less noise, specify:
 ```bash
 $ ksrc cat 'pro.respawn.flowmvi:core:3.3.0-alpha03!/commonMain/pro/respawn/flowmvi/api/StateReceiver.kt' --lines 10,25
 ```
+
+3. If you already know the path inside the source jar, use `where` to recover the reusable file-id and backing jar path:
+
+```bash
+$ ksrc where kotlinx/datetime/LocalDate.kt --group org.jetbrains.kotlinx --artifact kotlinx-datetime
+org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/kotlinx/datetime/LocalDate.kt|/path/to/kotlinx-datetime-0.7.1-sources.jar
+```
+
+For path lookups, text before `|` uses same `<file-id>` contract as `search`, so you can pass it directly to `ksrc cat` or `ksrc open`.
 
 ## License
 

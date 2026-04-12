@@ -55,7 +55,7 @@ go test -cover ./...
 - `internal/resolution/`: orchestration layer from CLI to Gradle/cache resolution.
 - `internal/gradle/`: init script generation, Gradle invocation, traversal (`root -> buildSrc -> included builds`).
 - `internal/resolve/`: cache scanning, coordinate/file-id parsing, filtering/version selection.
-- `internal/search/`: `rg` execution strategy (`--search-zip` when supported, extract fallback), output parsing.
+- `internal/search/`: persistent source-jar extraction cache plus `rg --json` output parsing.
 - `internal/cat/`: zip file reads and `--lines` range parsing.
 - `internal/mcpserver/`: stdio MCP server and tool handlers.
 - `internal/executil/`: command execution abstraction used for testability.
