@@ -15,8 +15,16 @@ type SearchInput struct {
 }
 
 type CatInput struct {
-	FileID string `json:"fileId" jsonschema:"file-id from search tool output. required."`
-	Lines  string `json:"lines,omitempty" jsonschema:"line range A,B (optional, default: entire file)"`
+	FileID        string   `json:"fileId" jsonschema:"file-id from search tool output. required."`
+	Lines         string   `json:"lines,omitempty" jsonschema:"line range A,B (optional, default: entire file)"`
+	Project       string   `json:"project,omitempty" jsonschema:"project path for fallback resolution (optional, default: . (cwd))"`
+	Config        []string `json:"config,omitempty" jsonschema:"Gradle config filters for fallback resolution (optional, default: scope defaults)"`
+	Subprojects   []string `json:"subprojects,omitempty" jsonschema:"subproject filters for fallback resolution (optional, default: all subprojects)"`
+	Scope         string   `json:"scope,omitempty" jsonschema:"dependency scope for fallback resolution (optional, default: compile)"`
+	Targets       []string `json:"targets,omitempty" jsonschema:"KMP target filters for fallback resolution (optional, default: all targets)"`
+	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc in fallback resolution (optional, default: true)"`
+	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript in fallback resolution (optional, default: true)"`
+	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds in fallback resolution (optional, default: true)"`
 }
 
 type DepsInput struct {

@@ -72,6 +72,8 @@ ksrc cat <file-id|path> [flags]
 - Relative source path: `com/example/http/HttpClient.java`
 - Fully qualified path: `group:artifact:version!/com/example/http/HttpClient.java`
 
+When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses the tracked backing jar path first. If that mapping is unavailable, it falls back to exact Gradle cache lookup, then project-aware resolution.
+
 **Flags**
 - `--project <path>`
 - `--module <glob>` (disambiguate)
@@ -89,6 +91,8 @@ Open a file in `$PAGER` (defaults to `less -R`).
 ```
 ksrc open <file-id|path> [flags]
 ```
+
+When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses the tracked backing jar path first. If that mapping is unavailable, it falls back to exact Gradle cache lookup, then project-aware resolution.
 
 **Flags**
 - `--project <path>`
@@ -245,4 +249,4 @@ ksrc mcp [flags]
 
 Parse `<file-id>` by splitting once on `!/`. The left side is `group:artifact:version`; the right side is the slash-normalized path inside the source jar.
 
-`ksrc search` and `ksrc where <path>` emit `<file-id>` in reusable form so clients can call `ksrc cat <file-id>` with no extra resolution steps.
+`ksrc search` and `ksrc where <path>` emit `<file-id>` in reusable form. `ksrc` persists the backing jar path for emitted file-ids, so follow-up `cat`, `open`, and `where <file-id>` calls usually work without repeating project-specific flags on the same machine.

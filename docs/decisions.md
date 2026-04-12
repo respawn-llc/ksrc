@@ -83,3 +83,9 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - Version comparison follows Maven-style qualifier semantics (`alpha`, `beta`, `milestone`, `rc`, `snapshot`, release, `sp`) plus common aliases, with `_` treated as a separator for cache version parity.
 - When version is omitted during cache fallback, selection walks cached versions in semantic descending order and returns the first version that actually has a cached `-sources.jar`.
 - This avoids silently picking prerelease or missing-source cache entries ahead of the correct release jar.
+
+## 2026-04-12: File-id follow-ups reuse tracked jar paths
+- `internal/fileidcache` persists `<file-id> -> <jar-path>` mappings under the user cache dir whenever `search` or `where <path>` emits a reusable file-id.
+- Follow-up `cat`, `open`, and `where <file-id>` first use that tracked jar path, then fall back to exact Gradle cache lookup, then project-aware resolution.
+- Rationale: preserve chained CLI/MCP follow-up behavior across cwd/process boundaries without changing the plaintext `<file-id>` contract.
+- `KSRC_FILEID_CACHE_DIR` overrides the cache root for tests and local debugging.

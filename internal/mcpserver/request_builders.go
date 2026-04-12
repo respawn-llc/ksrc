@@ -41,18 +41,22 @@ func buildSearchSpec(input SearchInput) adapter.ResolveSpec {
 	return spec
 }
 
-func buildFileIDSpec(coord resolve.Coord) adapter.ResolveSpec {
-	return adapter.ResolveSpec{
-		Project:               ".",
-		Module:                coord.String(),
-		Version:               coord.Version,
-		Scope:                 "compile",
-		IncludeBuildSrc:       true,
-		IncludeBuildscript:    true,
-		IncludeIncludedBuilds: true,
-		ApplyFilters:          true,
-		AllowCacheFallback:    true,
-	}
+func buildFileIDSpec(input CatInput, coord resolve.Coord) adapter.ResolveSpec {
+	spec := buildResolveSpec(resolveSpecInput{
+		Project:       input.Project,
+		Module:        coord.String(),
+		Version:       coord.Version,
+		Scope:         input.Scope,
+		Config:        input.Config,
+		Targets:       input.Targets,
+		Subprojects:   input.Subprojects,
+		Buildsrc:      input.Buildsrc,
+		Buildscript:   input.Buildscript,
+		IncludeBuilds: input.IncludeBuilds,
+	})
+	spec.ApplyFilters = true
+	spec.AllowCacheFallback = true
+	return spec
 }
 
 func buildDepsSpec(input DepsInput) adapter.ResolveSpec {

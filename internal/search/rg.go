@@ -18,11 +18,12 @@ import (
 )
 
 type Match struct {
-	FileID string
-	File   string
-	Line   int
-	Column int
-	Text   string
+	FileID  string
+	JarPath string
+	File    string
+	Line    int
+	Column  int
+	Text    string
 }
 
 type Options struct {
@@ -124,7 +125,7 @@ func parseRgLine(line string) (Match, bool) {
 	return match, true
 }
 
-type coordMapper func(string) (resolve.Coord, string, bool)
+type sourceMapper func(string) (resolve.SourceJar, string, bool)
 
 type rgParseResult struct {
 	Matches []Match
@@ -132,7 +133,7 @@ type rgParseResult struct {
 	Mapped  int
 }
 
-func parseRgOutput(stdout string, mapper coordMapper) rgParseResult {
+func parseRgOutput(stdout string, mapper sourceMapper) rgParseResult {
 	matches := []Match{}
 	parsed := 0
 	mapped := 0
@@ -146,27 +147,28 @@ func parseRgOutput(stdout string, mapper coordMapper) rgParseResult {
 			continue
 		}
 		parsed++
-		coord, inner, ok := mapper(m.File)
+		source, inner, ok := mapper(m.File)
 		if !ok {
 			continue
 		}
 		mapped++
-		m.FileID = resolve.FormatFileID(coord, inner)
+		m.FileID = resolve.FormatFileID(source.Coord, inner)
+		m.JarPath = source.Path
 		matches = append(matches, m)
 	}
 	return rgParseResult{Matches: matches, Parsed: parsed, Mapped: mapped}
 }
 
-func mapToCoord(roots map[string]resolve.Coord, filePath string) (resolve.Coord, string, bool) {
-	for root, coord := range roots {
+func mapToSource(roots map[string]resolve.SourceJar, filePath string) (resolve.SourceJar, string, bool) {
+	for root, source := range roots {
 		rel, err := filepath.Rel(root, filePath)
 		if err != nil || strings.HasPrefix(rel, "..") {
 			continue
 		}
 		rel = filepath.ToSlash(rel)
-		return coord, rel, true
+		return source, rel, true
 	}
-	return resolve.Coord{}, "", false
+	return resolve.SourceJar{}, "", false
 }
 
 type searchStrategy struct {
@@ -179,7 +181,7 @@ func selectStrategy(context.Context, executil.Runner) searchStrategy {
 }
 
 func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
-	extractRoots := make(map[string]resolve.Coord)
+	extractRoots := make(map[string]resolve.SourceJar)
 	searchDirs := make([]string, 0, len(opts.Jars))
 	seenDirs := make(map[string]struct{}, len(opts.Jars))
 	for _, j := range opts.Jars {
@@ -187,7 +189,7 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 		if err != nil {
 			return nil, err
 		}
-		extractRoots[dir] = j.Coord
+		extractRoots[dir] = j
 		if _, ok := seenDirs[dir]; ok {
 			continue
 		}
@@ -220,8 +222,8 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 		}
 	}
 
-	parsed := parseRgOutput(stdout, func(filePath string) (resolve.Coord, string, bool) {
-		return mapToCoord(extractRoots, filePath)
+	parsed := parseRgOutput(stdout, func(filePath string) (resolve.SourceJar, string, bool) {
+		return mapToSource(extractRoots, filePath)
 	})
 	return parsed.Matches, nil
 }

@@ -80,11 +80,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			var report func(search.ExecPlan)
 			if app.Verbose {
 				report = func(plan search.ExecPlan) {
-					rgLine := fmt.Sprintf("rg: %s %s", plan.Cmd, adapter.FormatRGArgs(plan))
-					emitVerbose(cmd, app.Verbose,
-						rgLine,
-						fmt.Sprintf("rg jars: %d (mode=%s)", plan.JarCount, plan.Mode),
-					)
+					_ = adapter.WriteRGCommandReport(cmd.ErrOrStderr(), plan)
 				}
 			}
 			matches, err := search.Run(ctx, app.Runner, search.Options{
@@ -97,6 +93,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			adapter.TryTrackSearchMatches(matches)
 			return adapter.WriteSearchMatches(cmd.OutOrStdout(), matches, showExtractedPath)
 		},
 	}

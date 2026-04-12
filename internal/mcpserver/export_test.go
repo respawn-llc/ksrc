@@ -10,6 +10,10 @@ func BuildSearchRequestForTest(input SearchInput) resolution.Request {
 	return adapter.BuildRequest(buildSearchSpec(input))
 }
 
+func BuildCatRequestForTest(input CatInput, coord resolve.Coord) resolution.Request {
+	return adapter.BuildRequest(buildFileIDSpec(input, coord))
+}
+
 func BuildResolveRequestForTest(input ResolveInput) resolution.Request {
 	return adapter.BuildRequest(buildResolveToolSpec(input))
 }

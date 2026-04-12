@@ -42,8 +42,7 @@ func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest)
 	var report func(search.ExecPlan)
 	if s.verbose {
 		report = func(plan search.ExecPlan) {
-			fmt.Fprintf(os.Stderr, "VERBOSE: rg: %s %s\n", plan.Cmd, adapter.FormatRGArgs(plan))
-			fmt.Fprintf(os.Stderr, "VERBOSE: rg jars: %d (mode=%s)\n", plan.JarCount, plan.Mode)
+			_ = adapter.WriteRGCommandReport(os.Stderr, plan)
 		}
 	}
 
@@ -58,6 +57,7 @@ func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest)
 	if err != nil {
 		return toolError(err), nil
 	}
+	adapter.TryTrackSearchMatches(matches)
 	if len(matches) == 0 {
 		return textResult("no results"), nil
 	}

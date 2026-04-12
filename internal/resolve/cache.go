@@ -11,6 +11,10 @@ import (
 
 var errCachedSourcesNotFound = errors.New("sources not found in cache")
 
+func IsCachedSourcesNotFound(err error) bool {
+	return errors.Is(err, errCachedSourcesNotFound)
+}
+
 func GradleCacheDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

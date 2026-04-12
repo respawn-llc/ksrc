@@ -14,6 +14,8 @@ If you want faster execution & less noise, consider adding:
 
 File-id format: `group:artifact:version!/path/inside/jar.ext` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
 
+When a file-id comes from `ksrc search` or `ksrc where <path>`, follow-up `cat`/`open` usually do not need repeated `--project` or scope/config flags on same machine.
+
 Give this tool generous timeouts. It can take a few minutes to download sources and set up gradle.
 
 ## Common issues

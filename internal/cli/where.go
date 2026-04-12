@@ -20,7 +20,19 @@ func newWhereCmd(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arg := strings.TrimSpace(args[0])
 			if strings.Contains(arg, "!/") {
-				coord, inner, err := resolve.ParseFileID(arg)
+				location := adapter.FileLocation{}
+				found := false
+				if !hasExplicitFollowupResolutionContext(cmd) {
+					var err error
+					location, found, err = adapter.FindFollowupFileIDLocation(arg)
+					if err != nil {
+						return err
+					}
+				}
+				if found {
+					return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
+				}
+				coord, _, err := resolve.ParseFileID(arg)
 				if err != nil {
 					return err
 				}
@@ -30,11 +42,12 @@ func newWhereCmd(app *App) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				jarPath, err := adapter.FindJarByCoord(sources, coord, adapter.NoSourcesHintForCoord(coord))
+				location, err = adapter.ResolveFileIDLocation(sources, arg, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
-				return adapter.WriteFileIDPath(cmd.OutOrStdout(), resolve.FormatFileID(coord, inner), jarPath)
+				adapter.TryTrackFileLocation(location)
+				return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
 			}
 
 			if coord, err := resolve.ParseCoord(arg); err == nil {
@@ -52,11 +65,11 @@ func newWhereCmd(app *App) *cobra.Command {
 				if len(sources) == 0 {
 					return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 				}
-				jarPath, err := adapter.FindJarByCoord(sources, coord, adapter.NoSourcesHintForCoord(coord))
+				source, err := adapter.ResolveCoordSource(sources, coord, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
-				return adapter.WriteCoordPath(cmd.OutOrStdout(), coord, jarPath)
+				return adapter.WriteCoordPath(cmd.OutOrStdout(), coord, source.Path)
 			}
 
 			if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
@@ -71,10 +84,11 @@ func newWhereCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			location, ok := adapter.FindFile(sources, arg)
-			if !ok {
-				return fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id", strings.TrimPrefix(arg, "/"))
+			location, err := adapter.ResolvePathLocation(sources, arg, "Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id")
+			if err != nil {
+				return err
 			}
+			adapter.TryTrackFileLocation(location)
 			return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
 		},
 	}

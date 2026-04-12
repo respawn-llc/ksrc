@@ -13,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/respawn-app/ksrc/internal/cat"
+	"github.com/respawn-app/ksrc/internal/testutil"
 )
 
 type toolSession interface {
@@ -42,6 +43,65 @@ func TestMCPServerSearchAndCatIntegration(t *testing.T) {
 	}
 
 	ctx, session, cleanup := startTestSession(t, root, projectDir, jarPath)
+	defer cleanup()
+
+	searchRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "search",
+		Arguments: map[string]any{
+			"query":       "public class LocalDate",
+			"group":       "org.jetbrains.kotlinx",
+			"artifact":    "kotlinx-datetime",
+			"project":     projectDir,
+			"subprojects": []string{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("search tool: %v", err)
+	}
+	searchText := textFromResult(searchRes)
+	expectedFileID := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/" + inner
+	if !strings.Contains(searchText, expectedFileID) {
+		t.Fatalf("unexpected search output: %s", searchText)
+	}
+
+	catRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cat",
+		Arguments: map[string]any{
+			"fileId": expectedFileID,
+			"lines":  "2,2",
+		},
+	})
+	if err != nil {
+		t.Fatalf("cat tool: %v", err)
+	}
+	catText := strings.TrimSpace(textFromResult(catRes))
+	if catText != "public class LocalDate" {
+		t.Fatalf("unexpected cat output: %q", catText)
+	}
+}
+
+func TestMCPServerSearchAndCatIntegrationReusesTrackedFileIDAcrossCWD(t *testing.T) {
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("rg not available")
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root := filepath.Clean(filepath.Join(wd, "..", ".."))
+	projectDir := filepath.Join(root, "testdata", "fixture")
+	jarPath := filepath.Join(t.TempDir(), "kotlinx-datetime-sources.jar")
+	inner := "kotlinx/datetime/LocalDate.kt"
+
+	if err := writeZipFile(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+	if _, err := cat.ReadFileFromZip(jarPath, inner, nil); err != nil {
+		t.Fatalf("jar missing test file: %v", err)
+	}
+
+	ctx, session, cleanup := startTestSessionAt(t, root, t.TempDir(), jarPath)
 	defer cleanup()
 
 	searchRes, err := session.CallTool(ctx, &mcp.CallToolParams{
@@ -136,6 +196,70 @@ func TestMCPServerWherePathEmitsFullyQualifiedFileID(t *testing.T) {
 	}
 }
 
+func TestMCPServerWherePathUsesZipDirectoryEntriesBeforeCatReadsContent(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root := filepath.Clean(filepath.Join(wd, "..", ".."))
+	projectDir := filepath.Join(root, "testdata", "fixture")
+	jarPath := filepath.Join(t.TempDir(), "kotlinx-datetime-sources.jar")
+	inner := "kotlinx/datetime/LocalDate.kt"
+
+	if err := writeZipFile(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+	if err := testutil.CorruptZipEntryMethod(jarPath, inner, 99); err != nil {
+		t.Fatalf("corrupt zip entry method: %v", err)
+	}
+
+	ctx, session, cleanup := startTestSession(t, root, projectDir, jarPath)
+	defer cleanup()
+
+	whereRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "where",
+		Arguments: map[string]any{
+			"pathOrCoord": inner,
+			"group":       "org.jetbrains.kotlinx",
+			"artifact":    "kotlinx-datetime",
+			"project":     projectDir,
+			"subprojects": []string{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("where tool: %v", err)
+	}
+	if whereRes.IsError {
+		t.Fatalf("where tool returned error: %s", textFromResult(whereRes))
+	}
+	whereText := textFromResult(whereRes)
+	want := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/" + inner + "|" + jarPath + "\n"
+	if whereText != want {
+		t.Fatalf("unexpected where output:\nwant: %q\n got: %q", want, whereText)
+	}
+
+	fileID, _, ok := strings.Cut(strings.TrimSpace(whereText), "|")
+	if !ok {
+		t.Fatalf("missing file-id separator in output: %q", whereText)
+	}
+
+	catRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cat",
+		Arguments: map[string]any{
+			"fileId": fileID,
+		},
+	})
+	if err != nil {
+		t.Fatalf("cat tool: %v", err)
+	}
+	if !catRes.IsError {
+		t.Fatal("expected cat tool to fail when entry body cannot be read")
+	}
+	if text := textFromResult(catRes); !strings.Contains(text, "unsupported compression algorithm") {
+		t.Fatalf("expected body read failure, got: %q", text)
+	}
+}
+
 func TestMCPServerDepsResolveFetchIntegration(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -203,6 +327,10 @@ func TestMCPServerDepsResolveFetchIntegration(t *testing.T) {
 }
 
 func startTestSession(t *testing.T, root string, projectDir string, jarPath string) (context.Context, toolSession, func()) {
+	return startTestSessionAt(t, root, projectDir, jarPath)
+}
+
+func startTestSessionAt(t *testing.T, root string, workDir string, jarPath string) (context.Context, toolSession, func()) {
 	t.Helper()
 
 	binPath := filepath.Join(t.TempDir(), "ksrc")
@@ -215,8 +343,12 @@ func startTestSession(t *testing.T, root string, projectDir string, jarPath stri
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	cmd := exec.CommandContext(ctx, binPath, "mcp", "--tools=all")
-	cmd.Dir = projectDir
-	cmd.Env = append(os.Environ(), "KSRC_TEST_JAR="+jarPath)
+	cmd.Dir = workDir
+	cacheDir := filepath.Join(t.TempDir(), "fileid-cache")
+	cmd.Env = append(os.Environ(),
+		"KSRC_TEST_JAR="+jarPath,
+		"KSRC_FILEID_CACHE_DIR="+cacheDir,
+	)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()

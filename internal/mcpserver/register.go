@@ -15,7 +15,7 @@ func registerTools(server *mcp.Server, state *toolState, tools ToolSet) {
 	if tools.Enabled(ToolCat) {
 		server.AddTool(&mcp.Tool{
 			Name:        toolName(ToolCat),
-			Description: "Read a file by file-id returned from ksrc `search` tool. Recommended: pass `lines` range as \"A,B\" to avoid reading large files.",
+			Description: "Read a file by file-id returned from ksrc `search` or `where`. Follow-up reads reuse the tracked backing jar path when available; for standalone/cache-miss reads, pass same `project`/scope/config filters used during search. Recommended: pass `lines` range as \"A,B\" to avoid reading large files.",
 			InputSchema: mustInputSchema[CatInput](),
 		}, state.handleCat)
 	}

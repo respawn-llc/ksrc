@@ -90,6 +90,8 @@ pro.respawn.flowmvi:core:3.3.0-alpha03!/commonMain/pro/respawn/flowmvi/api/State
 ```
 The tool returns one chainable record per hit in this format: `<file-id> <line>:<col>:<line-text>`. The text segment is the raw source line with its trailing newline stripped, so it may contain literal `:` characters.
 
+`ksrc` persists the backing jar path for emitted file-ids, so follow-up `cat`/`open` calls usually do not need repeated `--project` or scope/config flags on the same machine.
+
 If you want faster execution & less noise, specify:
 - `--artifact` to limit search to one artifact, (or `--module` to also limit by version)
 - `--subproject` to help discovery for monorepos/large modular apps

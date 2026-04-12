@@ -28,8 +28,23 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 	if err != nil {
 		return toolError(err), nil
 	}
+	location := adapter.FileLocation{}
+	found := false
+	if !catInputHasExplicitResolutionContext(input) {
+		location, found, err = adapter.FindFollowupFileIDLocation(fileID)
+		if err != nil {
+			return toolError(err), nil
+		}
+	}
+	if found {
+		data, err := cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
+		if err != nil {
+			return toolError(err), nil
+		}
+		return textResult(string(data)), nil
+	}
 
-	result, err := s.resolver().ResolveSources(ctx, buildFileIDSpec(coord))
+	result, err := s.resolver().ResolveSources(ctx, buildFileIDSpec(input, coord))
 	if err != nil {
 		return toolError(err), nil
 	}
@@ -37,11 +52,12 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 	if len(result.Sources) == 0 {
 		return toolError(adapter.NoSourcesError(adapter.NoSourcesHintForCoord(coord))), nil
 	}
-	jarPath, err := adapter.FindJarByCoord(result.Sources, coord, toolFetchHint())
+	location, err = adapter.ResolveFileIDLocation(result.Sources, fileID, toolFetchHint())
 	if err != nil {
 		return toolError(err), nil
 	}
-	data, err := cat.ReadFileFromZip(jarPath, inner, lr)
+	adapter.TryTrackFileLocation(location)
+	data, err := cat.ReadFileFromZip(location.Source.Path, inner, lr)
 	if err != nil {
 		return toolError(err), nil
 	}

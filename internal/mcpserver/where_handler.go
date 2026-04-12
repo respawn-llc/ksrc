@@ -21,7 +21,20 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 	}
 
 	if strings.Contains(arg, "!/") {
-		coord, inner, err := resolve.ParseFileID(arg)
+		location := adapter.FileLocation{}
+		found := false
+		if !whereInputHasExplicitFileIDContext(input) {
+			location, found, err = adapter.FindFollowupFileIDLocation(arg)
+			if err != nil {
+				return toolError(err), nil
+			}
+		}
+		if found {
+			return builderResult(func(sb *strings.Builder) error {
+				return adapter.WriteFileLocation(sb, location)
+			})
+		}
+		coord, _, err := resolve.ParseFileID(arg)
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -33,12 +46,13 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 		if len(result.Sources) == 0 {
 			return toolError(adapter.NoSourcesError(adapter.NoSourcesHintForCoord(coord))), nil
 		}
-		jarPath, err := adapter.FindJarByCoord(result.Sources, coord, toolFetchHint())
+		location, err = adapter.ResolveFileIDLocation(result.Sources, arg, toolFetchHint())
 		if err != nil {
 			return toolError(err), nil
 		}
+		adapter.TryTrackFileLocation(location)
 		return builderResult(func(sb *strings.Builder) error {
-			return adapter.WriteFileIDPath(sb, resolve.FormatFileID(coord, inner), jarPath)
+			return adapter.WriteFileLocation(sb, location)
 		})
 	}
 
@@ -55,12 +69,12 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 		if len(result.Sources) == 0 {
 			return toolError(adapter.NoSourcesError(adapter.NoSourcesHintForCoord(coord))), nil
 		}
-		jarPath, err := adapter.FindJarByCoord(result.Sources, coord, toolFetchHint())
+		source, err := adapter.ResolveCoordSource(result.Sources, coord, toolFetchHint())
 		if err != nil {
 			return toolError(err), nil
 		}
 		return builderResult(func(sb *strings.Builder) error {
-			return adapter.WriteCoordPath(sb, coord, jarPath)
+			return adapter.WriteCoordPath(sb, coord, source.Path)
 		})
 	}
 
@@ -70,7 +84,6 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 	if group == "" || artifact == "" {
 		return toolError(fmt.Errorf("path requires group and artifact filters or a file-id")), nil
 	}
-	path := strings.TrimPrefix(arg, "/")
 	result, err := s.resolver().ResolveSources(ctx, buildWhereSpec(input, group, artifact, version, ""))
 	if err != nil {
 		return toolError(err), nil
@@ -79,10 +92,11 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 	if len(result.Sources) == 0 {
 		return toolError(adapter.NoSourcesError(adapter.NoSourcesHint(group, artifact, version))), nil
 	}
-	location, ok := adapter.FindFile(result.Sources, path)
-	if !ok {
-		return toolError(fmt.Errorf("file not found in resolved sources: %s. Try specifying: `project` (for monorepos), `scope` for build time deps etc., or `configs` for non-standard compilations.", strings.TrimPrefix(path, "/"))), nil
+	location, err := adapter.ResolvePathLocation(result.Sources, arg, "Try specifying: `project` (for monorepos), `scope` for build time deps etc., or `configs` for non-standard compilations.")
+	if err != nil {
+		return toolError(err), nil
 	}
+	adapter.TryTrackFileLocation(location)
 	return builderResult(func(sb *strings.Builder) error {
 		return adapter.WriteFileLocation(sb, location)
 	})

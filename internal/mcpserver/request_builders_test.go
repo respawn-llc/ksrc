@@ -32,6 +32,36 @@ func TestBuildSearchSpecMatchesCLIRequest(t *testing.T) {
 	assertRequestsEqual(t, want, got)
 }
 
+func TestBuildCatSpecMatchesCLIRequest(t *testing.T) {
+	buildscript := false
+	coord := resolve.Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"}
+	input := mcpserver.CatInput{
+		Project:       " ./sample ",
+		Scope:         " runtime ",
+		Config:        []string{" runtimeClasspath ", ""},
+		Targets:       []string{" jvm ", ""},
+		Subprojects:   []string{" shared ", ""},
+		Buildscript:   &buildscript,
+		IncludeBuilds: nil,
+	}
+
+	got := mcpserver.BuildCatRequestForTest(input, coord)
+	want := cli.ResolveFlags{
+		Project:               input.Project,
+		Module:                coord.String(),
+		Version:               coord.Version,
+		Scope:                 input.Scope,
+		Config:                " runtimeClasspath ",
+		Targets:               " jvm ",
+		Subprojects:           input.Subprojects,
+		IncludeBuildSrc:       true,
+		IncludeBuildscript:    false,
+		IncludeIncludedBuilds: true,
+	}.ToRequest("", true, true)
+
+	assertRequestsEqual(t, want, got)
+}
+
 func TestBuildResolveSpecMatchesCLIRequest(t *testing.T) {
 	buildsrc := false
 	includeBuilds := false
