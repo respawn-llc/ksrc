@@ -307,6 +307,31 @@ func TestResolveSourcesMetaOrderForCompileFallbackAttempt(t *testing.T) {
 	})
 }
 
+func TestResolveSourcesMetaIncludesDetectedIncludedBuilds(t *testing.T) {
+	included := filepath.Join(t.TempDir(), "build-logic")
+	runner := &scriptedRunner{
+		results: []runResult{
+			{stdout: gradleRecordLine(t, gradleRecord{Type: "include", Path: included})},
+			{stdout: gradleRecordLine(t, gradleRecord{Type: "include", Path: included})},
+		},
+	}
+
+	service := Service{Runner: runner}
+	result, err := service.ResolveSources(context.Background(), Request{
+		Project:            ".",
+		Module:             "com.example:demo:1.0.0",
+		Scope:              "compile",
+		ApplyFilters:       true,
+		AllowCacheFallback: false,
+	})
+	if err != nil {
+		t.Fatalf("ResolveSources error: %v", err)
+	}
+	if len(result.Meta.IncludedBuilds) != 1 || result.Meta.IncludedBuilds[0] != included {
+		t.Fatalf("expected included build metadata %q, got %v", included, result.Meta.IncludedBuilds)
+	}
+}
+
 type gradleRecord struct {
 	Type     string `json:"type"`
 	Group    string `json:"group,omitempty"`

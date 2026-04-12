@@ -33,7 +33,7 @@ func newFetchCmd(app *App) *cobra.Command {
 			}
 			emitDiagnostics(cmd, meta, app.Verbose)
 			if len(sources) == 0 {
-				return noSourcesErr(flags, joinHints("Try: verify the coordinate exists in the project or run ksrc deps to see resolved coords.", projectHint(flags, meta)))
+				return noSourcesErr(flags, joinHints("Try: verify the coordinate exists in the project or run ksrc deps to see resolved coords.", projectHint(meta)))
 			}
 			return adapter.WriteCoordMatches(cmd.OutOrStdout(), sources, coord)
 		},

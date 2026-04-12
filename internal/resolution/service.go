@@ -39,6 +39,7 @@ type Request struct {
 type ResolveMeta struct {
 	Attempts            []string
 	TriedConfigPatterns []string
+	IncludedBuilds      []string
 	Warnings            []string
 	Verbose             []string
 }

@@ -89,3 +89,9 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - Follow-up `cat`, `open`, and `where <file-id>` first use that tracked jar path, then fall back to exact Gradle cache lookup, then project-aware resolution.
 - Rationale: preserve chained CLI/MCP follow-up behavior across cwd/process boundaries without changing the plaintext `<file-id>` contract.
 - `KSRC_FILEID_CACHE_DIR` overrides the cache root for tests and local debugging.
+
+## 2026-04-12: CLI no-source project hints use resolver metadata only
+- `internal/cli` no longer scans `build.gradle*` or `settings.gradle*` to guess Android, KMP, or composite-build shape.
+- Project hints are limited to included-build roots already discovered by Gradle traversal and surfaced through `resolution.ResolveMeta`.
+- If Gradle fails before traversal yields metadata, no composite-build hint is emitted.
+- Rationale: avoid regex/substring drift as build logic becomes more imperative while keeping monorepo `includeBuild` diagnostics.

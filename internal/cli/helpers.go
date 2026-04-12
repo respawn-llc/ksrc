@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/respawn-app/ksrc/internal/adapter"
@@ -31,26 +32,26 @@ func noSourcesHintForFlags(flags ResolveFlags, meta resolution.ResolveMeta) stri
 	if flags.All {
 		return joinHints(
 			"Try: ksrc deps (list resolved coords), then ksrc fetch <coord> to download sources.",
-			projectHint(flags, meta),
+			projectHint(meta),
 		)
 	}
 	if coord, ok := resolve.SelectorToCoord(flags.Module, flags.Group, flags.Artifact, flags.Version); ok {
 		if coord.Version != "" {
 			return joinHints(
 				fmt.Sprintf("Try: ksrc fetch %s to download sources.", coord.String()),
-				projectHint(flags, meta),
+				projectHint(meta),
 			)
 		}
 		if coord.Group != "" || coord.Artifact != "" {
 			return joinHints(
 				"Try: add a version (group:artifact:version) or run ksrc deps to see resolved coords.",
-				projectHint(flags, meta),
+				projectHint(meta),
 			)
 		}
 	}
 	return joinHints(
 		"Try: ksrc deps (list resolved coords), then ksrc fetch <coord> to download sources.",
-		projectHint(flags, meta),
+		projectHint(meta),
 	)
 }
 
@@ -72,33 +73,11 @@ func joinHints(parts ...string) string {
 	return strings.Join(out, " ")
 }
 
-func projectHint(flags ResolveFlags, meta resolution.ResolveMeta) string {
-	hints := DetectProjectHints(flags.Project)
-	var parts []string
-
-	if hints.HasIncludeBuilds {
-		parts = append(parts, fmt.Sprintf("Composite build detected; try: --project %s", hints.IncludeBuildHint))
-	}
-	if hints.Android && !metaHasConfig(meta, "*debugCompileClasspath") && !metaHasConfig(meta, "*DebugCompileClasspath") && strings.TrimSpace(flags.Config) == "" {
-		parts = append(parts, "Android detected; try: --config \"*debugCompileClasspath\" (or --config debugCompileClasspath)")
-	}
-	if hints.KMP && strings.TrimSpace(flags.Targets) == "" {
-		parts = append(parts, "KMP detected; try: --targets jvm (or another target)")
-	}
-	if len(parts) == 0 {
+func projectHint(meta resolution.ResolveMeta) string {
+	if len(meta.IncludedBuilds) == 0 {
 		return ""
 	}
-	parts = append(parts, "If resolution is slow: narrow with --subproject, --config, --targets, or --scope.")
-	return strings.Join(parts, " ")
-}
-
-func metaHasConfig(meta resolution.ResolveMeta, pattern string) bool {
-	for _, tried := range meta.TriedConfigPatterns {
-		if tried == pattern {
-			return true
-		}
-	}
-	return false
+	return fmt.Sprintf("Composite build detected; try: --project %s", filepath.Clean(meta.IncludedBuilds[0]))
 }
 
 func emitDiagnostics(cmd stderrWriter, meta resolution.ResolveMeta, verbose bool) {

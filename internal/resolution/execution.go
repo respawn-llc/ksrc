@@ -70,6 +70,7 @@ func (s Service) executePlan(ctx context.Context, plan resolutionPlan) (gradleEx
 		execution.LastDeps = result.Deps
 		execution.Meta.Attempts = append(execution.Meta.Attempts, stage.Label)
 		execution.Meta.TriedConfigPatterns = append(execution.Meta.TriedConfigPatterns, stage.ConfigPatterns...)
+		execution.Meta.IncludedBuilds = appendUniqueStrings(execution.Meta.IncludedBuilds, result.IncludedBuilds...)
 		execution.Meta.Warnings = append(execution.Meta.Warnings, result.Warnings...)
 		execution.Meta.Verbose = append(execution.Meta.Verbose, result.Verbose...)
 

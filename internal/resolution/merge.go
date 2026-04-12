@@ -57,10 +57,30 @@ func mergeResolveMeta(parts ...ResolveMeta) ResolveMeta {
 	for _, part := range parts {
 		meta.Attempts = append(meta.Attempts, part.Attempts...)
 		meta.TriedConfigPatterns = append(meta.TriedConfigPatterns, part.TriedConfigPatterns...)
+		meta.IncludedBuilds = appendUniqueStrings(meta.IncludedBuilds, part.IncludedBuilds...)
 		meta.Warnings = append(meta.Warnings, part.Warnings...)
 		meta.Verbose = append(meta.Verbose, part.Verbose...)
 	}
 	return meta
+}
+
+func appendUniqueStrings(existing []string, values ...string) []string {
+	if len(values) == 0 {
+		return existing
+	}
+
+	seen := make(map[string]struct{}, len(existing))
+	for _, value := range existing {
+		seen[value] = struct{}{}
+	}
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		existing = append(existing, value)
+	}
+	return existing
 }
 
 func mergeAttemptOutcomes(outcomes []attemptOutcome) mergedAttemptResults {

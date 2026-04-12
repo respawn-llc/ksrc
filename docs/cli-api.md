@@ -14,6 +14,7 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 - If Gradle resolution fails, `ksrc` falls back to cache-only resolution and emits a warning.
 - Cache-only mode may return results that don't match the current project; it uses the highest cached source-bearing version under Maven-style version ordering if no version is specified.
 - With `--all`, cache-only mode scans all cached sources (can be large/slow).
+- `E_NO_SOURCES` may suggest `--project <included-build-root>` only when Gradle traversal actually discovered included builds. The CLI does not scan `build.gradle*`/`settings.gradle*` text for Android, KMP, or composite-build hints.
 
 ### `ksrc search <pattern>`
 Search dependency sources for a pattern, optionally filtered by module/group.
