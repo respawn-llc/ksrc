@@ -48,15 +48,17 @@ func FindFollowupFileIDLocation(fileID string) (FileLocation, bool, error) {
 		return FileLocation{}, false, err
 	}
 	jarPath, found, err := fileidcache.Lookup(fileID)
-	if err != nil {
-		return FileLocation{}, false, err
-	}
 	if found {
 		return FileLocation{
 			Source:    resolve.SourceJar{Coord: coord, Path: jarPath},
 			InnerPath: inner,
 			FileID:    resolve.FormatFileID(coord, inner),
 		}, true, nil
+	}
+	if err != nil {
+		// File-id cache is best-effort. Read failures should degrade to cache miss so
+		// follow-up commands can still resolve from Gradle caches.
+		err = nil
 	}
 	source, found, err := FindCachedCoordSource(coord)
 	if err != nil || !found {
