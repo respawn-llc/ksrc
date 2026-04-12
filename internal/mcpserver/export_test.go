@@ -18,10 +18,18 @@ func BuildResolveRequestForTest(input ResolveInput) resolution.Request {
 	return adapter.BuildRequest(buildResolveToolSpec(input))
 }
 
+func BuildDepsRequestForTest(input DepsInput) resolution.Request {
+	return adapter.BuildRequest(buildDepsSpec(input))
+}
+
 func BuildFetchRequestForTest(input FetchInput, coord resolve.Coord) resolution.Request {
 	return adapter.BuildRequest(buildFetchSpec(input, coord))
 }
 
 func BuildWhereCoordRequestForTest(input WhereInput, coord resolve.Coord, dep string) resolution.Request {
 	return adapter.BuildRequest(buildWhereCoordSpec(input, coord, dep))
+}
+
+func BuildWhereSelectorRequestForTest(input WhereInput, group, artifact, version, dep string) resolution.Request {
+	return adapter.BuildRequest(buildWhereSpec(input, group, artifact, version, dep))
 }

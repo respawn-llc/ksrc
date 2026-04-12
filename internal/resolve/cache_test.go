@@ -175,6 +175,15 @@ func TestHighestCachedSourceVersionPrefersDotNumericOverPlusQualifiedVersion(t *
 	}
 }
 
+func TestHighestCachedSourceVersionMissingDirectoryIsCacheMiss(t *testing.T) {
+	groupArtifactDir := filepath.Join(t.TempDir(), "missing")
+
+	_, err := HighestCachedSourceVersion(groupArtifactDir)
+	if !IsCachedSourcesNotFound(err) {
+		t.Fatalf("expected cache miss error, got %v", err)
+	}
+}
+
 func TestHighestCachedSourceVersionSeparatorParity(t *testing.T) {
 	testCases := []struct {
 		name     string

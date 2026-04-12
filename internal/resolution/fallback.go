@@ -32,7 +32,7 @@ func applyCacheFallbackPolicy(plan resolutionPlan, execution gradleExecution) ca
 		return cacheFallbackResult{Mode: cacheFallbackNone}
 	}
 
-	coord, ok := resolve.SelectorToCoord(plan.Request.Module, plan.Request.Group, plan.Request.Artifact, plan.Request.Version)
+	coord, ok := cacheFallbackCoord(plan, execution)
 	if !ok {
 		return cacheFallbackResult{Mode: cacheFallbackNone}
 	}
@@ -46,6 +46,14 @@ func applyCacheFallbackPolicy(plan resolutionPlan, execution gradleExecution) ca
 		Sources: sources,
 		Found:   true,
 	}
+}
+
+func cacheFallbackCoord(plan resolutionPlan, execution gradleExecution) (resolve.Coord, bool) {
+	resolved := resolve.FilterCoords(execution.LastDeps, plan.Request.Module, plan.Request.Group, plan.Request.Artifact, plan.Request.Version)
+	if len(resolved) == 1 {
+		return resolved[0], true
+	}
+	return resolve.SelectorToCoord(plan.Request.Module, plan.Request.Group, plan.Request.Artifact, plan.Request.Version)
 }
 
 func resolveCacheOnlyFallback(plan resolutionPlan) cacheFallbackResult {

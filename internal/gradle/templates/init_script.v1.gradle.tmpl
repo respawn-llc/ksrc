@@ -127,9 +127,12 @@ gradle.rootProject { root ->
     }
 
     if (depProp) {
+        def depProjects = selectedProjects.isEmpty() ? [root] : selectedProjects
         root.tasks.register('ksrcSources') {
             doLast {
-                emitForProject(project)
+                depProjects.each { p ->
+                    emitForProject(p)
+                }
             }
         }
         return

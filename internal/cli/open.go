@@ -46,10 +46,11 @@ func newOpenCmd(app *App) *cobra.Command {
 					}
 					flags.Module = coord.String()
 					flags.Version = coord.Version
-					sources, _, _, err := resolveSources(context.Background(), app, flags, "", true, true)
+					sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
 					if err != nil {
 						return err
 					}
+					emitDiagnostics(cmd, meta, app.Verbose)
 					if len(sources) == 0 {
 						return noSourcesErr(flags, noSourcesHintForCoord(coord))
 					}

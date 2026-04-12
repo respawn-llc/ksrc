@@ -20,7 +20,7 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 	if fileID == "" {
 		return toolError(fmt.Errorf("fileId is required. Obtain it from `search` tool output, the file id is the string before the line:column")), nil
 	}
-	coord, inner, err := resolve.ParseFileID(fileID)
+	coord, _, err := resolve.ParseFileID(fileID)
 	if err != nil {
 		return toolError(err), nil
 	}
@@ -57,7 +57,7 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 		return toolError(err), nil
 	}
 	adapter.TryTrackFileLocation(location)
-	data, err := cat.ReadFileFromZip(location.Source.Path, inner, lr)
+	data, err := cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
 	if err != nil {
 		return toolError(err), nil
 	}

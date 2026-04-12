@@ -34,7 +34,10 @@ func (s *toolState) handleSearch(ctx context.Context, call *mcp.CallToolRequest)
 		return toolError(fmt.Errorf("rg not found on PATH, ask the user to install ripgrep first. The user can run `ksrc doctor` to get guidance.")), nil
 	}
 
-	rgArgs := cleanList(input.RgArgs)
+	rgArgs, err := cleanRgArgs(input.RgArgs)
+	if err != nil {
+		return toolError(err), nil
+	}
 	if input.Context > 0 {
 		rgArgs = append(rgArgs, "-C", fmt.Sprintf("%d", input.Context))
 	}

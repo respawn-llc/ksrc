@@ -1,5 +1,84 @@
 package mcpserver
 
+import (
+	"fmt"
+	"strings"
+)
+
+type rgArgRule struct {
+	Canonical     string
+	RequiresValue bool
+}
+
+var allowedRgArgs = map[string]rgArgRule{
+	"-F":               {Canonical: "-F"},
+	"--fixed-strings":  {Canonical: "--fixed-strings"},
+	"-P":               {Canonical: "-P"},
+	"--pcre2":          {Canonical: "--pcre2"},
+	"-a":               {Canonical: "-a"},
+	"--text":           {Canonical: "--text"},
+	"-i":               {Canonical: "-i"},
+	"--ignore-case":    {Canonical: "--ignore-case"},
+	"-s":               {Canonical: "-s"},
+	"--case-sensitive": {Canonical: "--case-sensitive"},
+	"-w":               {Canonical: "-w"},
+	"--word-regexp":    {Canonical: "--word-regexp"},
+	"-x":               {Canonical: "-x"},
+	"--line-regexp":    {Canonical: "--line-regexp"},
+	"-g":               {Canonical: "-g", RequiresValue: true},
+	"--glob":           {Canonical: "--glob", RequiresValue: true},
+	"-m":               {Canonical: "-m", RequiresValue: true},
+	"--max-count":      {Canonical: "--max-count", RequiresValue: true},
+}
+
+func sanitizeRgArgs(values []string) ([]string, error) {
+	cleaned := make([]string, 0, len(values))
+	for i := 0; i < len(values); i++ {
+		arg := strings.TrimSpace(values[i])
+		if arg == "" {
+			continue
+		}
+		if !strings.HasPrefix(arg, "-") {
+			return nil, fmt.Errorf("unsupported rg arg %q: only a safe subset of flags is allowed", arg)
+		}
+
+		name := arg
+		inlineValue := ""
+		if strings.HasPrefix(arg, "--") {
+			if base, value, ok := strings.Cut(arg, "="); ok {
+				name = base
+				inlineValue = value
+			}
+		}
+
+		rule, ok := allowedRgArgs[name]
+		if !ok {
+			return nil, fmt.Errorf("unsupported rg arg %q: only search-safe flags are allowed", arg)
+		}
+		if !rule.RequiresValue {
+			if inlineValue != "" {
+				return nil, fmt.Errorf("rg arg %q does not accept an inline value", arg)
+			}
+			cleaned = append(cleaned, arg)
+			continue
+		}
+		if inlineValue != "" {
+			cleaned = append(cleaned, arg)
+			continue
+		}
+		if i+1 >= len(values) {
+			return nil, fmt.Errorf("rg arg %q requires a value", arg)
+		}
+		value := strings.TrimSpace(values[i+1])
+		if value == "" || strings.HasPrefix(value, "-") {
+			return nil, fmt.Errorf("rg arg %q requires a non-flag value", arg)
+		}
+		cleaned = append(cleaned, arg, value)
+		i++
+	}
+	return cleaned, nil
+}
+
 type SearchInput struct {
 	Query       string   `json:"query" jsonschema:"search pattern as a rg-style glob. required."`
 	Context     int      `json:"context,omitempty" jsonschema:"context lines (optional, default: 0)"`

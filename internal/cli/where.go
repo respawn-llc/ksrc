@@ -38,10 +38,11 @@ func newWhereCmd(app *App) *cobra.Command {
 				}
 				flags.Module = coord.String()
 				flags.Version = coord.Version
-				sources, _, _, err := resolveSources(context.Background(), app, flags, coord.String(), true, true)
+				sources, _, meta, err := resolveSources(context.Background(), app, flags, coord.String(), true, true)
 				if err != nil {
 					return err
 				}
+				emitDiagnostics(cmd, meta, app.Verbose)
 				location, err = adapter.ResolveFileIDLocation(sources, arg, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err

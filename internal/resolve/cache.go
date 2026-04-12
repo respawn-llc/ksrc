@@ -126,6 +126,9 @@ func HighestCachedSourceVersion(groupArtifactDir string) (string, error) {
 func cachedVersionDirs(groupArtifactDir string) ([]string, error) {
 	entries, err := os.ReadDir(groupArtifactDir)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, errCachedSourcesNotFound
+		}
 		return nil, err
 	}
 	versions := make([]string, 0, len(entries))

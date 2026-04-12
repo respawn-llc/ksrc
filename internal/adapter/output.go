@@ -3,6 +3,7 @@ package adapter
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/respawn-app/ksrc/internal/resolve"
@@ -33,7 +34,7 @@ func WriteRGCommandReport(w io.Writer, plan search.ExecPlan) error {
 func WriteSearchMatches(w io.Writer, matches []search.Match, showExtractedPath bool) error {
 	for _, match := range matches {
 		if showExtractedPath {
-			if _, err := fmt.Fprintf(w, "%s %s:%d:%d:%s\n", match.FileID, match.File, match.Line, match.Column, match.Text); err != nil {
+			if _, err := fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%s\n", match.FileID, strconv.Quote(match.File), match.Line, match.Column, strconv.Quote(match.Text)); err != nil {
 				return err
 			}
 			continue

@@ -56,6 +56,9 @@ Parse contract:
 - Parse the first two `:`-delimited decimal fields in the payload as `<line>` and `<col>`.
 - Treat the remainder verbatim as `<line-text>`.
 
+When `--show-extracted-path` is enabled, each line uses a tab-delimited debug shape:
+`<file-id>\t<quoted-extracted-path>\t<line>\t<col>\t<quoted-line-text>`
+
 **Aliases**
 - `ksrc rg` is an alias of `ksrc search`
 

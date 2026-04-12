@@ -305,7 +305,11 @@ func extractJarCached(src string) (string, error) {
 
 func searchExtractCacheRoot() (string, error) {
 	if dir := strings.TrimSpace(os.Getenv(extractCacheDirEnv)); dir != "" {
-		return filepath.Clean(dir), nil
+		abs, err := filepath.Abs(dir)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Clean(abs), nil
 	}
 	base, err := os.UserCacheDir()
 	if err != nil {

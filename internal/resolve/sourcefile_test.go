@@ -94,6 +94,25 @@ func TestFileIDRoundTripNormalizesBackslashes(t *testing.T) {
 	}
 }
 
+func TestFileIDRoundTripNormalizesRepeatedLeadingSlashes(t *testing.T) {
+	coord := Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
+	fileID := FormatFileID(coord, "///nested/path/File.kt")
+	if fileID != "com.example:demo:1.0.0!/nested/path/File.kt" {
+		t.Fatalf("FormatFileID() = %q", fileID)
+	}
+
+	parsedCoord, inner, err := ParseFileID("com.example:demo:1.0.0!////nested/path/File.kt")
+	if err != nil {
+		t.Fatalf("ParseFileID() error = %v", err)
+	}
+	if parsedCoord != coord {
+		t.Fatalf("parsed coord = %#v, want %#v", parsedCoord, coord)
+	}
+	if inner != "nested/path/File.kt" {
+		t.Fatalf("parsed inner path = %q", inner)
+	}
+}
+
 func writeZipFile(t *testing.T, path, inner, content string) error {
 	t.Helper()
 	f, err := os.Create(path)

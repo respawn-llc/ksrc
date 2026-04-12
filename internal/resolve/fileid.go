@@ -29,5 +29,5 @@ func ParseFileID(value string) (Coord, string, error) {
 
 func normalizeFileIDPath(path string) string {
 	path = strings.ReplaceAll(path, "\\", "/")
-	return strings.TrimPrefix(path, "/")
+	return strings.TrimLeft(path, "/")
 }

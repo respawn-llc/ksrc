@@ -46,3 +46,22 @@ func TestWriteRGCommandReport(t *testing.T) {
 		t.Fatalf("unexpected report: %q", got)
 	}
 }
+
+func TestWriteSearchMatchesWithExtractedPathUsesQuotedTabSeparatedFields(t *testing.T) {
+	var sb strings.Builder
+	matches := []search.Match{{
+		FileID: "g:a:1!/src/Main.kt",
+		File:   "/tmp/with space/src:Main.kt",
+		Line:   12,
+		Column: 3,
+		Text:   "value\twith colon: and quote \"",
+	}}
+
+	if err := WriteSearchMatches(&sb, matches, true); err != nil {
+		t.Fatalf("WriteSearchMatches error: %v", err)
+	}
+	want := "g:a:1!/src/Main.kt\t\"/tmp/with space/src:Main.kt\"\t12\t3\t\"value\\twith colon: and quote \\\"\"\n"
+	if got := sb.String(); got != want {
+		t.Fatalf("unexpected output:\nwant: %q\n got: %q", want, got)
+	}
+}

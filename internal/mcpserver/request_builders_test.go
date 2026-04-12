@@ -96,6 +96,32 @@ func TestBuildResolveSpecMatchesCLIRequest(t *testing.T) {
 	assertRequestsEqual(t, want, got)
 }
 
+func TestBuildDepsSpecMatchesCLIRequest(t *testing.T) {
+	buildscript := false
+	input := mcpserver.DepsInput{
+		Project:     " ./sample ",
+		Scope:       " runtime ",
+		Config:      []string{" runtimeClasspath ", ""},
+		Targets:     []string{" jvm ", ""},
+		Subprojects: []string{" shared ", ""},
+		Buildscript: &buildscript,
+	}
+
+	got := mcpserver.BuildDepsRequestForTest(input)
+	want := cli.ResolveFlags{
+		Project:               input.Project,
+		Scope:                 input.Scope,
+		Config:                " runtimeClasspath ",
+		Targets:               " jvm ",
+		Subprojects:           input.Subprojects,
+		IncludeBuildSrc:       true,
+		IncludeBuildscript:    false,
+		IncludeIncludedBuilds: true,
+	}.ToRequest("", false, false)
+
+	assertRequestsEqual(t, want, got)
+}
+
 func TestBuildFetchSpecMatchesCLIRequest(t *testing.T) {
 	buildscript := false
 	coord := resolve.Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"}
@@ -145,6 +171,36 @@ func TestBuildWhereCoordSpecMatchesCLIRequest(t *testing.T) {
 		IncludeBuildscript:    false,
 		IncludeIncludedBuilds: true,
 	}.ToRequest(coord.String(), true, true)
+
+	assertRequestsEqual(t, want, got)
+}
+
+func TestBuildWhereSelectorSpecMatchesCLIRequest(t *testing.T) {
+	buildsrc := false
+	input := mcpserver.WhereInput{
+		Project:       " ./sample ",
+		Scope:         " runtime ",
+		Config:        []string{" runtimeClasspath ", ""},
+		Targets:       []string{" jvm ", ""},
+		Subprojects:   []string{" shared ", ""},
+		Buildsrc:      &buildsrc,
+		IncludeBuilds: nil,
+	}
+
+	got := mcpserver.BuildWhereSelectorRequestForTest(input, " org.jetbrains.kotlinx ", " kotlinx-datetime ", " 0.7.1 ", "")
+	want := cli.ResolveFlags{
+		Project:               input.Project,
+		Group:                 " org.jetbrains.kotlinx ",
+		Artifact:              " kotlinx-datetime ",
+		Version:               " 0.7.1 ",
+		Scope:                 input.Scope,
+		Config:                " runtimeClasspath ",
+		Targets:               " jvm ",
+		Subprojects:           input.Subprojects,
+		IncludeBuildSrc:       false,
+		IncludeBuildscript:    true,
+		IncludeIncludedBuilds: true,
+	}.ToRequest("", true, true)
 
 	assertRequestsEqual(t, want, got)
 }
