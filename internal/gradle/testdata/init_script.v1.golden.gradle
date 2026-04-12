@@ -1,0 +1,240 @@
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import groovy.json.JsonOutput
+
+def splitCsv = { String value ->
+    if (value == null) return [] as Set
+    value.split(',').collect { it.trim() }.findAll { it }.toSet()
+}
+
+def matchesGlobPattern = { String patterns, String value ->
+    if (patterns == null || patterns.trim().isEmpty()) return true
+    def candidate = value == null ? '' : value
+    patterns.split(',').collect { it.trim() }.findAll { it }.any { pattern ->
+        if (pattern.equalsIgnoreCase(candidate)) return true
+        try {
+            return java.nio.file.FileSystems.default
+                .getPathMatcher('glob:' + pattern)
+                .matches(java.nio.file.Paths.get(candidate))
+        } catch (Throwable ignored) {
+            return false
+        }
+    }
+}
+
+def normalizeSelectorCandidate = { String value ->
+    def candidate = value == null ? '' : value
+    return candidate.replace('-', '.')
+}
+
+def moduleSelectorCandidates = { String group, String artifact ->
+    return [
+        group,
+        artifact,
+        group + ':' + artifact,
+        normalizeSelectorCandidate(artifact),
+        normalizeSelectorCandidate(group + ':' + artifact)
+    ]
+}
+
+def matchesModuleSelector = { String selector, String group, String artifact, String version ->
+    selector = selector == null ? '' : selector.trim()
+    if (selector.isEmpty()) return true
+    if (selector.contains(':')) {
+        def parts = selector.split(':', -1)
+        if (parts.length >= 2) {
+            if (!matchesGlobPattern(parts[0], group)) return false
+            if (!matchesGlobPattern(parts[1], artifact)) return false
+            if (parts.length >= 3 && parts[2]) return matchesGlobPattern(parts[2], version)
+            return true
+        }
+    }
+    return moduleSelectorCandidates(group, artifact).any { candidate ->
+        matchesGlobPattern(selector, candidate) || candidate.contains(selector)
+    }
+}
+
+def matchesCoordinateSelectors = { String moduleSelector, String groupSelector, String artifactSelector, String versionSelector, String group, String artifact, String version ->
+    return matchesModuleSelector(moduleSelector, group, artifact, version) &&
+        matchesGlobPattern(groupSelector, group) &&
+        matchesGlobPattern(artifactSelector, artifact) &&
+        matchesGlobPattern(versionSelector, version)
+}
+
+
+def isSelectedProject = { String pathOrName, String projectPath, String projectName ->
+    if (pathOrName.startsWith(':')) return pathOrName == projectPath
+    return pathOrName == projectName
+}
+
+def matchesTargets = { String name, Set targets ->
+    if (targets.isEmpty()) return true
+    if (['compileClasspath','runtimeClasspath','testCompileClasspath','testRuntimeClasspath'].contains(name)) return true
+    if (name.startsWith('common')) return true
+    return targets.any { target -> name.startsWith(target) }
+}
+
+def matchesScope = { String name, String scope ->
+    switch (scope) {
+        case 'compile':
+            return name == 'compileClasspath' || name.endsWith('MainCompileClasspath')
+        case 'runtime':
+            return name == 'runtimeClasspath' || name.endsWith('MainRuntimeClasspath')
+        case 'test':
+            return name == 'testCompileClasspath' || name == 'testRuntimeClasspath' || name.endsWith('TestCompileClasspath') || name.endsWith('TestRuntimeClasspath')
+        case 'all':
+            return true
+        default:
+            return name == 'compileClasspath' || name.endsWith('MainCompileClasspath')
+    }
+}
+
+def props = gradle.startParameter.projectProperties
+def moduleProp = props['ksrcModule']
+def groupProp = props['ksrcGroup']
+def artifactProp = props['ksrcArtifact']
+def versionProp = props['ksrcVersion']
+def configProp = props['ksrcConfig']
+def targetsProp = props['ksrcTargets']
+def subprojectsProp = props['ksrcSubprojects']
+def scopeProp = props['ksrcScope'] ?: 'compile'
+def depProp = props['ksrcDep']
+def includeBuildscript = (props['ksrcBuildscript'] ?: 'true').toString().toBoolean()
+def includeIncludedBuilds = (props['ksrcIncludeBuilds'] ?: 'true').toString().toBoolean()
+def emitRecord = { Map payload ->
+    println "KSRCJSON\t${JsonOutput.toJson(payload)}"
+}
+
+gradle.rootProject { root ->
+
+    def configs = splitCsv(configProp as String)
+    def targets = splitCsv(targetsProp as String)
+    def subprojects = splitCsv(subprojectsProp as String)
+
+    def selectedProjects = subprojects.isEmpty() ? root.allprojects : root.allprojects.findAll { p ->
+        subprojects.any { isSelectedProject(it as String, p.path, p.name) }
+    }
+
+    def emitForProject = { proj ->
+        def selectedConfigs = []
+        if (!depProp) {
+            proj.configurations.each { cfg ->
+                if (!cfg.canBeResolved) return
+                if (!configs.isEmpty()) {
+                    if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) selectedConfigs << cfg
+                } else {
+                    if (matchesTargets(cfg.name, targets) && matchesScope(cfg.name, scopeProp as String)) selectedConfigs << cfg
+                }
+            }
+        } else {
+            def dep = proj.dependencies.create(depProp as String)
+            def detached = proj.configurations.detachedConfiguration(dep)
+            detached.transitive = false
+            selectedConfigs << detached
+        }
+
+        def moduleIds = [] as Set
+        selectedConfigs.each { cfg ->
+            cfg.incoming.resolutionResult.allComponents.each { comp ->
+                def id = comp.id
+                if (id instanceof ModuleComponentIdentifier) moduleIds << id
+            }
+        }
+
+        if (includeBuildscript) {
+            def buildscriptConfigs = []
+            proj.buildscript.configurations.each { cfg ->
+                if (!cfg.canBeResolved) return
+                if (!configs.isEmpty()) {
+                    if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) buildscriptConfigs << cfg
+                } else {
+                    buildscriptConfigs << cfg
+                }
+            }
+            buildscriptConfigs.each { cfg ->
+                cfg.incoming.resolutionResult.allComponents.each { comp ->
+                    def id = comp.id
+                    if (id instanceof ModuleComponentIdentifier) moduleIds << id
+                }
+            }
+        }
+
+        def filteredIds = moduleIds.findAll { id ->
+            matchesCoordinateSelectors(moduleProp as String, groupProp as String, artifactProp as String, versionProp as String, id.group, id.module, id.version)
+        }
+
+        filteredIds.each { id ->
+            emitRecord([type: 'dep', group: id.group, artifact: id.module, version: id.version])
+        }
+
+        if (filteredIds.isEmpty()) return
+
+        def sourceDeps = filteredIds.collect { id ->
+            proj.dependencies.create([group: id.group, name: id.module, version: id.version, classifier: 'sources'])
+        }
+        if (sourceDeps.isEmpty()) return
+
+        def sourcesCfg = proj.configurations.detachedConfiguration()
+        sourceDeps.each { dep ->
+            sourcesCfg.dependencies.add(dep)
+        }
+        sourcesCfg.transitive = false
+        def lenient = sourcesCfg.resolvedConfiguration.lenientConfiguration
+        lenient.artifacts.each { art ->
+            def id = art.moduleVersion.id
+            emitRecord([type: 'source', group: id.group, artifact: id.name, version: id.version, path: art.file.absolutePath])
+        }
+    }
+
+    if (depProp) {
+        def depProjects = subprojects.isEmpty() ? [root] : selectedProjects
+        root.tasks.register('ksrcSources') {
+            doLast {
+                depProjects.each { p ->
+                    emitForProject(p)
+                }
+            }
+        }
+        return
+    }
+
+    def projectTasks = []
+    selectedProjects.each { p ->
+        def projectRef = p
+        projectRef.tasks.register('ksrcSourcesProject') {
+            doLast {
+                emitForProject(projectRef)
+            }
+        }
+        projectTasks << projectRef.tasks.named('ksrcSourcesProject')
+    }
+
+    root.tasks.register('ksrcSources') {
+        dependsOn(projectTasks)
+    }
+}
+
+gradle.settingsEvaluated { settings ->
+    if (!includeIncludedBuilds) return
+    try {
+        gradle.includedBuilds.each { build ->
+            def dir = null
+            try {
+                dir = build.projectDir
+            } catch (Throwable ignored) {
+                dir = null
+            }
+            if (dir == null) {
+                try {
+                    dir = build.rootDir
+                } catch (Throwable ignored) {
+                    dir = null
+                }
+            }
+            if (dir != null) {
+                emitRecord([type: 'include', path: dir.absolutePath])
+            }
+        }
+    } catch (Throwable ignored) {
+        // Included builds may be unavailable for this Gradle version or lifecycle phase.
+    }
+}

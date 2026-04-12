@@ -12,8 +12,9 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 
 ## Resolution Notes
 - If Gradle resolution fails, `ksrc` falls back to cache-only resolution and emits a warning.
-- Cache-only mode may return results that don't match the current project; it uses the latest cached version if no version is specified.
+- Cache-only mode may return results that don't match the current project; it uses the highest cached source-bearing version under Maven-style version ordering if no version is specified.
 - With `--all`, cache-only mode scans all cached sources (can be large/slow).
+- `E_NO_SOURCES` may suggest `--project <included-build-root>` only when Gradle traversal actually discovered included builds. The CLI does not scan `build.gradle*`/`settings.gradle*` text for Android, KMP, or composite-build hints.
 
 ### `ksrc search <pattern>`
 Search dependency sources for a pattern, optionally filtered by module/group.
@@ -46,7 +47,17 @@ If no selector is provided, `ksrc` defaults to `--all`. Use `--module`/`--group`
 - `--show-extracted-path`: Include temp extracted paths in output (off by default)
 
 **Output (default)**
-`<file-id> <line>:<col>:<match>` (use `--show-extracted-path` to include temp paths)
+`<file-id> <line>:<col>:<line-text>` (use `--show-extracted-path` to include temp paths)
+
+`<line-text>` is the full source line with the trailing newline stripped. It may contain literal `:` characters. When `--context` is set, context lines use the same shape with `<col>` set to `0`.
+
+Parse contract:
+- Split once on the first space to separate `<file-id>` from the location/text payload.
+- Parse the first two `:`-delimited decimal fields in the payload as `<line>` and `<col>`.
+- Treat the remainder verbatim as `<line-text>`.
+
+When `--show-extracted-path` is enabled, each line uses a tab-delimited debug shape:
+`<file-id>\t<quoted-extracted-path>\t<line>\t<col>\t<quoted-line-text>`
 
 **Aliases**
 - `ksrc rg` is an alias of `ksrc search`
@@ -65,6 +76,8 @@ ksrc cat <file-id|path> [flags]
 - Relative source path: `com/example/http/HttpClient.java`
 - Fully qualified path: `group:artifact:version!/com/example/http/HttpClient.java`
 
+When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses the tracked backing jar path first. If that mapping is unavailable, it falls back to exact Gradle cache lookup, then project-aware resolution.
+
 **Flags**
 - `--project <path>`
 - `--module <glob>` (disambiguate)
@@ -82,6 +95,8 @@ Open a file in `$PAGER` (defaults to `less -R`).
 ```
 ksrc open <file-id|path> [flags]
 ```
+
+When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses the tracked backing jar path first. If that mapping is unavailable, it falls back to exact Gradle cache lookup, then project-aware resolution.
 
 **Flags**
 - `--project <path>`
@@ -141,12 +156,27 @@ Locate the Gradle cached source artifact or file.
 **Usage**
 ```
 ksrc where org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1
-ksrc where com/example/http/HttpClient.java
+ksrc where com/example/http/HttpClient.java --group com.example --artifact http
 ```
+
+**Path Forms**
+- Coordinate: `group:artifact[:version]`
+- Relative source path: `com/example/http/HttpClient.java` (requires `--module`, or `--group` plus `--artifact`)
+- File ID: `group:artifact:version!/com/example/http/HttpClient.java`
+
+**Output**
+- Coordinate lookup: `<coord>|<jar-path>`
+- File-id lookup: `<file-id>|<jar-path>`
+- Path lookup: `<file-id>|<jar-path>`
+
+For path lookups, the emitted `<file-id>` always uses the resolved `group:artifact:version`, even if the input only provided `--group`/`--artifact` or `--module` without a version. This makes the result directly reusable with `ksrc cat <file-id>` and `ksrc open <file-id>`.
 
 **Flags**
 - `--project <path>`
 - `--module <glob>` (disambiguate)
+- `--group <glob>`
+- `--artifact <glob>`
+- `--version <glob>`
 - `--scope <compile|runtime|test|all>`
 - `--config <name>` (glob supported; comma‑separated)
 - `--targets <list>` (comma‑separated)
@@ -221,4 +251,6 @@ ksrc mcp [flags]
 `<file-id>` is a fully qualified path to a file inside a source JAR:
 `group:artifact:version!/path/inside/jar.ext`
 
-`ksrc search` emits `<file-id>` in every result line so clients can call `ksrc cat <file-id>` with no extra resolution steps.
+Parse `<file-id>` by splitting once on `!/`. The left side is `group:artifact:version`; the right side is the slash-normalized path inside the source jar.
+
+`ksrc search` and `ksrc where <path>` emit `<file-id>` in reusable form. `ksrc` persists the backing jar path for emitted file-ids, so follow-up `cat`, `open`, and `where <file-id>` calls usually work without repeating project-specific flags on the same machine.

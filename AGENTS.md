@@ -51,11 +51,12 @@ go test -cover ./...
 
 ## Project Layout & Module Map
 - `cmd/ksrc/main.go`: CLI entrypoint.
-- `internal/cli/`: Cobra command wiring, flags, output formatting, hints.
+- `internal/adapter/`: shared CLI/MCP adapter for resolution request building, diagnostics, source lookup, and plaintext output formatting.
+- `internal/cli/`: Cobra command wiring, flags, and CLI-specific hints.
 - `internal/resolution/`: orchestration layer from CLI to Gradle/cache resolution.
-- `internal/gradle/`: init script generation, Gradle invocation, traversal (`root -> buildSrc -> included builds`).
+- `internal/gradle/`: init script generation from versioned embedded Groovy templates, Gradle invocation, traversal (`root -> buildSrc -> included builds`).
 - `internal/resolve/`: cache scanning, coordinate/file-id parsing, filtering/version selection.
-- `internal/search/`: `rg` execution strategy (`--search-zip` when supported, extract fallback), output parsing.
+- `internal/search/`: persistent source-jar extraction cache plus `rg --json` output parsing.
 - `internal/cat/`: zip file reads and `--lines` range parsing.
 - `internal/mcpserver/`: stdio MCP server and tool handlers.
 - `internal/executil/`: command execution abstraction used for testability.
@@ -70,7 +71,8 @@ go test -cover ./...
 - Keep `./bin/ksrc` current if your local shell/tooling points to it.
 
 ## Architecture Notes
-- Keep command wiring thin in `internal/cli`; add behavior in domain packages (`resolution`, `gradle`, `resolve`, `search`, `cat`, `mcpserver`).
+- Keep command wiring thin in `internal/cli` and `internal/mcpserver`; keep shared source-tool behavior in `internal/adapter` and domain behavior in `resolution`, `gradle`, `resolve`, `search`, and `cat`.
+- Keep Gradle init scripts as versioned embedded template files under `internal/gradle/templates/`; test template rendering directly and avoid large inline Go string literals.
 - Preserve zero-mutation behavior for target Gradle projects; only temporary files are allowed.
 - Resolution behavior is intentional and documented in `docs/decisions.md`.
 - Gradle invocation failures fall back to cache-only resolution with warnings; this is part of UX contract.

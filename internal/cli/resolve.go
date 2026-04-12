@@ -2,8 +2,8 @@ package cli
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/spf13/cobra"
 )
 
@@ -22,10 +22,7 @@ func newResolveCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			for _, s := range sources {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", s.Coord.String(), s.Path)
-			}
-			return nil
+			return adapter.WriteCoordPaths(cmd.OutOrStdout(), sources)
 		},
 	}
 

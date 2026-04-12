@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/cat"
 	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
@@ -29,30 +30,43 @@ func newOpenCmd(app *App) *cobra.Command {
 
 			var data []byte
 			if strings.Contains(arg, "!/") {
-				coord, inner, err := resolve.ParseFileID(arg)
-				if err != nil {
-					return err
+				location := adapter.FileLocation{}
+				found := false
+				if !hasExplicitFollowupResolutionContext(cmd) {
+					var err error
+					location, found, err = adapter.FindFollowupFileIDLocation(arg)
+					if err != nil {
+						return err
+					}
 				}
-				flags.Module = coord.String()
-				flags.Version = coord.Version
-				sources, _, _, err := resolveSources(context.Background(), app, flags, "", true, true)
-				if err != nil {
-					return err
+				if !found {
+					coord, _, err := resolve.ParseFileID(arg)
+					if err != nil {
+						return err
+					}
+					flags.Module = coord.String()
+					flags.Version = coord.Version
+					sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
+					if err != nil {
+						return err
+					}
+					emitDiagnostics(cmd, meta, app.Verbose)
+					if len(sources) == 0 {
+						return noSourcesErr(flags, noSourcesHintForCoord(coord))
+					}
+					location, err = adapter.ResolveFileIDLocation(sources, arg, adapter.NoSourcesHintForCoord(coord))
+					if err != nil {
+						return err
+					}
+					adapter.TryTrackFileLocation(location)
 				}
-				if len(sources) == 0 {
-					return noSourcesErr(flags, noSourcesHintForCoord(coord))
-				}
-				jarPath, err := findJarByCoord(sources, coord)
-				if err != nil {
-					return err
-				}
-				data, err = cat.ReadFileFromZip(jarPath, inner, lr)
+				data, err = cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
 				if err != nil {
 					return err
 				}
 			} else {
 				if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
-					return fmt.Errorf("path requires --module or a file-id. Try: ksrc open <file-id> or ksrc open --module group:artifact[:version] <path>")
+					return fmt.Errorf("path requires --module, or --group plus --artifact, or a file-id. Try: ksrc open <file-id> or ksrc open --module group:artifact[:version] <path>")
 				}
 				sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
 				if err != nil {
@@ -62,11 +76,11 @@ func newOpenCmd(app *App) *cobra.Command {
 				if len(sources) == 0 {
 					return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 				}
-				jarPath, inner, err := findFileInJars(sources, arg)
+				location, err := adapter.ResolvePathLocation(sources, arg, "Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id")
 				if err != nil {
 					return err
 				}
-				data, err = cat.ReadFileFromZip(jarPath, inner, lr)
+				data, err = cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
 				if err != nil {
 					return err
 				}

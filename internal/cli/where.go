@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
@@ -19,22 +20,35 @@ func newWhereCmd(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arg := strings.TrimSpace(args[0])
 			if strings.Contains(arg, "!/") {
-				coord, inner, err := resolve.ParseFileID(arg)
+				location := adapter.FileLocation{}
+				found := false
+				if !hasExplicitFollowupResolutionContext(cmd) {
+					var err error
+					location, found, err = adapter.FindFollowupFileIDLocation(arg)
+					if err != nil {
+						return err
+					}
+				}
+				if found {
+					return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
+				}
+				coord, _, err := resolve.ParseFileID(arg)
 				if err != nil {
 					return err
 				}
 				flags.Module = coord.String()
 				flags.Version = coord.Version
-				sources, _, _, err := resolveSources(context.Background(), app, flags, coord.String(), true, true)
+				sources, _, meta, err := resolveSources(context.Background(), app, flags, coord.String(), true, true)
 				if err != nil {
 					return err
 				}
-				jarPath, err := findJarByCoord(sources, coord)
+				emitDiagnostics(cmd, meta, app.Verbose)
+				location, err = adapter.ResolveFileIDLocation(sources, arg, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", coord.String()+"!/"+inner, jarPath)
-				return nil
+				adapter.TryTrackFileLocation(location)
+				return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
 			}
 
 			if coord, err := resolve.ParseCoord(arg); err == nil {
@@ -52,16 +66,15 @@ func newWhereCmd(app *App) *cobra.Command {
 				if len(sources) == 0 {
 					return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 				}
-				jarPath, err := findJarByCoord(sources, coord)
+				source, err := adapter.ResolveCoordSource(sources, coord, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", coord.String(), jarPath)
-				return nil
+				return adapter.WriteCoordPath(cmd.OutOrStdout(), coord, source.Path)
 			}
 
 			if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
-				return fmt.Errorf("path requires --module or a file-id")
+				return fmt.Errorf("path requires --module, or --group plus --artifact, or a file-id")
 			}
 
 			sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
@@ -72,12 +85,12 @@ func newWhereCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			jarPath, inner, err := findFileInJars(sources, arg)
+			location, err := adapter.ResolvePathLocation(sources, arg, "Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id")
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", flags.Module+"!/"+inner, jarPath)
-			return nil
+			adapter.TryTrackFileLocation(location)
+			return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
 		},
 	}
 

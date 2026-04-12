@@ -2,11 +2,14 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/respawn-app/ksrc/internal/resolution"
 )
 
 type failingRunner struct {
@@ -133,7 +136,8 @@ func TestResolveSourcesAllKeepsMergedResultsOnGradleFailure(t *testing.T) {
 	runner := &scriptedRunner{
 		results: []runResult{
 			{
-				stdout: "KSRC|com.example:demo:1.0.0|/tmp/demo-1.0.0-sources.jar\nKSRCDEP|com.example:demo:1.0.0\n",
+				stdout: gradleRecordLine(t, gradleRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-1.0.0-sources.jar"}) +
+					gradleRecordLine(t, gradleRecord{Type: "dep", Group: "com.example", Artifact: "demo", Version: "1.0.0"}),
 			},
 			{
 				stderr: "BUILD FAILED",
@@ -170,4 +174,57 @@ func TestResolveSourcesAllKeepsMergedResultsOnGradleFailure(t *testing.T) {
 	if len(meta.Warnings) == 0 || !strings.Contains(meta.Warnings[0], "Gradle failed") {
 		t.Fatalf("expected Gradle failed warning, got: %v", meta.Warnings)
 	}
+}
+
+func TestNoSourcesHintForFlagsUsesIncludedBuildMetaOnly(t *testing.T) {
+	included := filepath.Join(".", "build-logic")
+	hint := noSourcesHintForFlags(ResolveFlags{All: true}, resolution.ResolveMeta{IncludedBuilds: []string{included}})
+
+	if !strings.Contains(hint, "Composite build detected; try: --project build-logic") {
+		t.Fatalf("expected composite build hint, got %q", hint)
+	}
+	if strings.Contains(hint, "Android detected") || strings.Contains(hint, "KMP detected") {
+		t.Fatalf("expected no build-script heuristics in hint, got %q", hint)
+	}
+	if strings.Contains(hint, "If resolution is slow") {
+		t.Fatalf("expected no generic narrowing hint, got %q", hint)
+	}
+}
+
+func TestResolveNoSourcesAfterGradleFailureHasNoCompositeHintWithoutTraversalMeta(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	app := &App{Runner: failingRunner{stderr: "BUILD FAILED"}}
+	output, err := runCommand(app, []string{"resolve", "--project", ".", "--module", "com.example:missing:1.0.0"})
+	if err == nil {
+		t.Fatalf("expected resolve error, got output %q", output)
+	}
+	if !strings.Contains(err.Error(), "E_NO_SOURCES") {
+		t.Fatalf("expected E_NO_SOURCES, got %v", err)
+	}
+	if strings.Contains(err.Error(), "Composite build detected") {
+		t.Fatalf("did not expect composite build hint without traversal metadata: %v", err)
+	}
+	if !strings.Contains(output, "WARN: Gradle failed") {
+		t.Fatalf("expected Gradle warning in output, got %q", output)
+	}
+}
+
+type gradleRecord struct {
+	Type     string `json:"type"`
+	Group    string `json:"group,omitempty"`
+	Artifact string `json:"artifact,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Path     string `json:"path,omitempty"`
+}
+
+func gradleRecordLine(t *testing.T, payload gradleRecord) string {
+	t.Helper()
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal gradle record: %v", err)
+	}
+	return "KSRCJSON\t" + string(encoded) + "\n"
 }

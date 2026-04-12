@@ -14,13 +14,15 @@ If you want faster execution & less noise, consider adding:
 
 File-id format: `group:artifact:version!/path/inside/jar.ext` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
 
+When a file-id comes from `ksrc search` or `ksrc where <path>`, follow-up `cat`/`open` usually do not need repeated `--project` or scope/config flags on same machine.
+
 Give this tool generous timeouts. It can take a few minutes to download sources and set up gradle.
 
 ## Common issues
 - If, unexpectedly, no matches are found, try `--project` with app project (not monorepo root), specifying `--scope` (esp. for build-time deps), or `ksrc doctor`.
 - `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
 - Gradle not found: a) run in a Gradle project dir, b) set `--project` path explicitly, c) install gradle on machine.
-- Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; re-run with `-v` to see Gradle output for debugging.
+- Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; when no version is pinned it picks the highest cached source-bearing version under Maven-style ordering. Re-run with `-v` to see Gradle output for debugging.
 - Gradle fails with unresolved class version: User's Local java in env is resolved to something unsupported by gradle. Help them fix Gradle<>JDK incompatibility.
 - Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow scope.
 
@@ -28,7 +30,15 @@ Give this tool generous timeouts. It can take a few minutes to download sources 
 ### `ksrc search <pattern> [-- <rg-args>]`
 Search dependency sources.
 
-Output format: `<file-id> <line>:<col>:<match>`
+Output format: `<file-id> <line>:<col>:<line-text>`
+
+Parsing rule:
+- Split once on first space to isolate `<file-id>`.
+- Parse first two `:`-delimited decimal fields as `<line>` and `<col>`.
+- Treat remainder verbatim as `<line-text>`; it may contain `:`.
+
+With `--show-extracted-path`, output shape changes to:
+`<file-id>\t<quoted-extracted-path>\t<line>\t<col>\t<quoted-line-text>`
 
 Common flags:
 - `--all` search across all resolved deps (default, slow)

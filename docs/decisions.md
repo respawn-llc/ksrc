@@ -49,7 +49,8 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - This provides a better first-try UX for Android repos without making the default slow for every run.
 
 ## Error Handling & Warnings
-- Root build failures are fatal.
+- Root build Gradle execution failures are warnings; resolution falls back to cache-only mode.
+- Cache-only fallback may return results that do not match the current project exactly; when version is omitted, selector fallback chooses the highest cached source-bearing version under Maven-style version ordering. Warnings make degraded mode explicit.
 - Fallback failures (buildSrc/included builds) are warnings; the command continues.
 - Warnings are emitted to stderr.
 
@@ -59,9 +60,39 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 ## 2026-01-24: Resolution orchestration split
 - CLI delegates resolution to `internal/resolution` to keep command wiring thin.
 - Gradle traversal is separated from invocation/parsing with an injectable resolver for tests.
-- Search strategy selection is separated from rg output parsing; zip capability is cached per process.
+- Search execution is separated from rg output parsing so search backends can evolve without changing CLI formatting.
 
 ## 2026-01-31: MCP tools return plaintext only (no structuredContent)
 - Problem: some MCP harnesses (e.g. Codex) prefer `structuredContent` over `content`. The Go SDK auto-populates `structuredContent` for typed handlers (`ToolHandlerFor`), and when the output type was `struct{}`, it serialized to `{}`. That caused harnesses to ignore the real plaintext output in `content`.
 - Decision: switch MCP tools to untyped handlers (`ToolHandler`) and supply explicit `InputSchema` to keep validation while ensuring we only emit `content` text. Errors are returned as `IsError=true` with a text payload in `content`.
 - Tradeoff: we lose auto-generated output schemas/structured output, but avoid empty `{}` structured payloads and keep cross-harness behavior consistent for plaintext tools.
+
+## 2026-04-12: Internal parsers use machine-readable records
+- `internal/search` invokes `rg --json` and decodes typed `match`/`context` events instead of parsing human-oriented `path:line:col:text` output.
+- `internal/gradle` init script emits `KSRCJSON\t<json>` records for deps, source jars, and included builds; the Go side ignores all non-prefixed Gradle log lines.
+- External `ksrc search` output remains plaintext: `<file-id> <line>:<col>:<line-text>`. `<line-text>` is raw line content with trailing newline stripped and may contain literal `:`.
+- Optional debug output for `ksrc search --show-extracted-path` uses tab-delimited quoted fields: `<file-id>\t<quoted-extracted-path>\t<line>\t<col>\t<quoted-line-text>`.
+
+## 2026-04-12: Search always extracts into a persistent cache
+- `rg --search-zip` cannot provide stable archive-entry provenance for `<file-id>` mapping, so search no longer uses it.
+- `internal/search` extracts source jars into a persistent cache under the user cache dir, keyed by canonical absolute jar path.
+- This intentionally models production Gradle cache behavior, where artifact paths are already checksum-addressed, and avoids extra hashing or metadata churn in the hot search path.
+- `KSRC_EXTRACT_CACHE_DIR` overrides the cache root for tests and local debugging.
+
+## 2026-04-12: Cache fallback uses Maven-style version ordering
+- `internal/resolve` no longer uses custom token/lexicographic version ordering for cache fallback selection.
+- Version comparison follows Maven-style qualifier semantics (`alpha`, `beta`, `milestone`, `rc`, `snapshot`, release, `sp`) plus common aliases, with `_` treated as a separator for cache version parity.
+- When version is omitted during cache fallback, selection walks cached versions in semantic descending order and returns the first version that actually has a cached `-sources.jar`.
+- This avoids silently picking prerelease or missing-source cache entries ahead of the correct release jar.
+
+## 2026-04-12: File-id follow-ups reuse tracked jar paths
+- `internal/fileidcache` persists `<file-id> -> <jar-path>` mappings under the user cache dir whenever `search` or `where <path>` emits a reusable file-id.
+- Follow-up `cat`, `open`, and `where <file-id>` first use that tracked jar path, then fall back to exact Gradle cache lookup, then project-aware resolution.
+- Rationale: preserve chained CLI/MCP follow-up behavior across cwd/process boundaries without changing the plaintext `<file-id>` contract.
+- `KSRC_FILEID_CACHE_DIR` overrides the cache root for tests and local debugging.
+
+## 2026-04-12: CLI no-source project hints use resolver metadata only
+- `internal/cli` no longer scans `build.gradle*` or `settings.gradle*` to guess Android, KMP, or composite-build shape.
+- Project hints are limited to included-build roots already discovered by Gradle traversal and surfaced through `resolution.ResolveMeta`.
+- If Gradle fails before traversal yields metadata, no composite-build hint is emitted.
+- Rationale: avoid regex/substring drift as build logic becomes more imperative while keeping monorepo `includeBuild` diagnostics.

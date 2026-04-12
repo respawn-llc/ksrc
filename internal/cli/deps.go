@@ -2,8 +2,8 @@ package cli
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/spf13/cobra"
 )
 
@@ -19,38 +19,7 @@ func newDepsCmd(app *App) *cobra.Command {
 				return err
 			}
 			emitDiagnostics(cmd, meta, app.Verbose)
-			sourceByCoord := make(map[string]string)
-			for _, s := range sources {
-				sourceByCoord[s.Coord.String()] = s.Path
-			}
-
-			seen := make(map[string]struct{})
-			for _, d := range deps {
-				key := d.String()
-				if _, ok := seen[key]; ok {
-					continue
-				}
-				seen[key] = struct{}{}
-				path := sourceByCoord[key]
-				sourcesYes := "no"
-				if path != "" {
-					sourcesYes = "yes"
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s  [sources: %s]  [path: %s]\n", key, sourcesYes, path)
-			}
-
-			if len(deps) == 0 {
-				for _, s := range sources {
-					key := s.Coord.String()
-					if _, ok := seen[key]; ok {
-						continue
-					}
-					seen[key] = struct{}{}
-					fmt.Fprintf(cmd.OutOrStdout(), "%s  [sources: yes]  [path: %s]\n", key, s.Path)
-				}
-			}
-
-			return nil
+			return adapter.WriteDepsOutput(cmd.OutOrStdout(), sources, deps)
 		},
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
@@ -32,14 +33,9 @@ func newFetchCmd(app *App) *cobra.Command {
 			}
 			emitDiagnostics(cmd, meta, app.Verbose)
 			if len(sources) == 0 {
-				return noSourcesErr(flags, joinHints("Try: verify the coordinate exists in the project or run ksrc deps to see resolved coords.", projectHint(flags, meta)))
+				return noSourcesErr(flags, joinHints("Try: verify the coordinate exists in the project or run ksrc deps to see resolved coords.", projectHint(meta)))
 			}
-			for _, s := range sources {
-				if s.Coord.Group == coord.Group && s.Coord.Artifact == coord.Artifact && s.Coord.Version == coord.Version {
-					fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", s.Coord.String(), s.Path)
-				}
-			}
-			return nil
+			return adapter.WriteCoordMatches(cmd.OutOrStdout(), sources, coord)
 		},
 	}
 
