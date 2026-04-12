@@ -139,6 +139,48 @@ func TestMCPServerSearchAndCatIntegrationReusesTrackedFileIDAcrossCWD(t *testing
 	}
 }
 
+func TestMCPServerSearchRejectsUnsafeRgArgs(t *testing.T) {
+	if _, err := exec.LookPath("rg"); err != nil {
+		t.Skip("rg not available")
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root := filepath.Clean(filepath.Join(wd, "..", ".."))
+	projectDir := filepath.Join(root, "testdata", "fixture")
+	jarPath := filepath.Join(t.TempDir(), "kotlinx-datetime-sources.jar")
+	inner := "kotlinx/datetime/LocalDate.kt"
+
+	if err := writeZipFile(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	ctx, session, cleanup := startTestSession(t, root, projectDir, jarPath)
+	defer cleanup()
+
+	searchRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "search",
+		Arguments: map[string]any{
+			"query":    "public class LocalDate",
+			"group":    "org.jetbrains.kotlinx",
+			"artifact": "kotlinx-datetime",
+			"project":  projectDir,
+			"rgArgs":   []string{"--heading"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("search tool: %v", err)
+	}
+	if !searchRes.IsError {
+		t.Fatal("expected search tool to reject unsafe rgArgs")
+	}
+	if text := textFromResult(searchRes); !strings.Contains(text, "unsupported rg arg \"--heading\"") {
+		t.Fatalf("unexpected search error: %q", text)
+	}
+}
+
 func TestMCPServerWherePathEmitsFullyQualifiedFileID(t *testing.T) {
 	wd, err := os.Getwd()
 	if err != nil {

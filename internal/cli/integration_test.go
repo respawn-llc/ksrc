@@ -2,6 +2,7 @@ package cli
 
 import (
 	"archive/zip"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -350,6 +351,41 @@ func TestSearchReusesPersistentExtractCache(t *testing.T) {
 	}
 	if first != second {
 		t.Fatalf("expected identical search output, first=%q second=%q", first, second)
+	}
+}
+
+func TestSearchShowExtractedPathUsesQuotedTabSeparatedOutput(t *testing.T) {
+	app := NewApp()
+	if _, err := app.Runner.LookPath("rg"); err != nil {
+		t.Skip("rg not available")
+	}
+
+	projectDir := filepath.Clean(filepath.Join("..", "..", "testdata", "fixture"))
+	jarPath := filepath.Join(t.TempDir(), "kotlinx-datetime-sources.jar")
+	inner := "kotlinx/datetime/LocalDate.kt"
+	cacheDir := filepath.Join(t.TempDir(), "extract-cache")
+
+	if err := writeTestJar(jarPath, inner, "public class LocalDate\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	setTestJarEnv(t, jarPath)
+	t.Setenv("KSRC_EXTRACT_CACHE_DIR", cacheDir)
+
+	out, err := runCommand(app, []string{"search", "public class LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir, "--show-extracted-path"})
+	if err != nil {
+		t.Fatalf("search error: %v", err)
+	}
+
+	absJarPath, err := filepath.Abs(jarPath)
+	if err != nil {
+		t.Fatalf("abs jar path: %v", err)
+	}
+	cacheKey := fmt.Sprintf("%x", sha256.Sum256([]byte(filepath.Clean(absJarPath))))
+	extractedPath := filepath.Join(cacheDir, cacheKey, filepath.FromSlash(inner))
+	want := fmt.Sprintf("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/%s\t%q\t1\t1\t%q\n", inner, extractedPath, "public class LocalDate")
+	if out != want {
+		t.Fatalf("unexpected show-extracted-path output:\nwant: %q\n got: %q", want, out)
 	}
 }
 
