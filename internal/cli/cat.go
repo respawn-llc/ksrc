@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/cat"
 	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ func newCatCmd(app *App) *cobra.Command {
 				if len(sources) == 0 {
 					return noSourcesErr(flags, noSourcesHintForCoord(coord))
 				}
-				jarPath, err := findJarByCoord(sources, coord)
+				jarPath, err := adapter.FindJarByCoord(sources, coord, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
@@ -64,11 +65,11 @@ func newCatCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			source, inner, ok := resolve.FindFileInSources(sources, arg)
+			location, ok := adapter.FindFile(sources, arg)
 			if !ok {
 				return fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id", strings.TrimPrefix(arg, "/"))
 			}
-			data, err := cat.ReadFileFromZip(source.Path, inner, lr)
+			data, err := cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
 			if err != nil {
 				return err
 			}
@@ -94,13 +95,4 @@ func newCatCmd(app *App) *cobra.Command {
 	cmd.Flags().StringVar(&lines, "lines", "", "line range (start,end | start:end | start-end | start..end | start;end)")
 
 	return cmd
-}
-
-func findJarByCoord(sources []resolve.SourceJar, coord resolve.Coord) (string, error) {
-	for _, s := range sources {
-		if s.Coord.Group == coord.Group && s.Coord.Artifact == coord.Artifact && s.Coord.Version == coord.Version {
-			return s.Path, nil
-		}
-	}
-	return "", fmt.Errorf("source jar not found for %s. Try: ksrc fetch %s", coord.String(), coord.String())
 }

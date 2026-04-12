@@ -136,6 +136,72 @@ func TestMCPServerWherePathEmitsFullyQualifiedFileID(t *testing.T) {
 	}
 }
 
+func TestMCPServerDepsResolveFetchIntegration(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root := filepath.Clean(filepath.Join(wd, "..", ".."))
+	projectDir := filepath.Join(root, "testdata", "fixture")
+	jarPath := filepath.Join(t.TempDir(), "kotlinx-datetime-sources.jar")
+	inner := "kotlinx/datetime/LocalDate.kt"
+	coord := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1"
+
+	if err := writeZipFile(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	ctx, session, cleanup := startTestSession(t, root, projectDir, jarPath)
+	defer cleanup()
+
+	depsRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "deps",
+		Arguments: map[string]any{
+			"project": projectDir,
+		},
+	})
+	if err != nil {
+		t.Fatalf("deps tool: %v", err)
+	}
+	depsText := textFromResult(depsRes)
+	if !strings.Contains(depsText, coord+"  [sources: yes]  [path: "+jarPath+"]") {
+		t.Fatalf("unexpected deps output: %q", depsText)
+	}
+
+	resolveRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "resolve",
+		Arguments: map[string]any{
+			"project":  projectDir,
+			"group":    "org.jetbrains.kotlinx",
+			"artifact": "kotlinx-datetime",
+		},
+	})
+	if err != nil {
+		t.Fatalf("resolve tool: %v", err)
+	}
+	resolveText := textFromResult(resolveRes)
+	if !strings.Contains(resolveText, coord+"|"+jarPath) {
+		t.Fatalf("unexpected resolve output: %q", resolveText)
+	}
+
+	fetchRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "fetch",
+		Arguments: map[string]any{
+			"project":  projectDir,
+			"group":    "org.jetbrains.kotlinx",
+			"artifact": "kotlinx-datetime",
+			"version":  "0.7.1",
+		},
+	})
+	if err != nil {
+		t.Fatalf("fetch tool: %v", err)
+	}
+	fetchText := textFromResult(fetchRes)
+	if fetchText != coord+"|"+jarPath+"\n" {
+		t.Fatalf("unexpected fetch output: %q", fetchText)
+	}
+}
+
 func startTestSession(t *testing.T, root string, projectDir string, jarPath string) (context.Context, toolSession, func()) {
 	t.Helper()
 

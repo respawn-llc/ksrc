@@ -2,24 +2,21 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/resolution"
 	"github.com/respawn-app/ksrc/internal/resolve"
 )
 
 func resolveSources(ctx context.Context, app *App, flags ResolveFlags, dep string, applyFilters bool, allowCacheFallback bool) ([]resolve.SourceJar, []resolve.Coord, resolution.ResolveMeta, error) {
-	service := resolution.Service{Runner: app.Runner, Verbose: app.Verbose}
-	req := flags.ToRequest(dep, applyFilters, allowCacheFallback)
-	result, err := service.ResolveSources(ctx, req)
+	result, err := adapter.Resolver{Runner: app.Runner, Verbose: app.Verbose}.ResolveSources(ctx, flags.ToSpec(dep, applyFilters, allowCacheFallback))
 	return result.Sources, result.Deps, result.Meta, err
 }
 
 func noSourcesErr(flags ResolveFlags, hint string) error {
-	msg := "E_NO_SOURCES: no sources resolved."
 	var parts []string
 	if flags.Offline {
 		parts = append(parts, "You ran with --offline; rerun without it to allow downloads.")
@@ -27,10 +24,7 @@ func noSourcesErr(flags ResolveFlags, hint string) error {
 	if strings.TrimSpace(hint) != "" {
 		parts = append(parts, hint)
 	}
-	if len(parts) == 0 {
-		return errors.New(strings.TrimSuffix(msg, "."))
-	}
-	return errors.New(msg + " " + strings.Join(parts, " "))
+	return adapter.NoSourcesError(strings.Join(parts, " "))
 }
 
 func noSourcesHintForFlags(flags ResolveFlags, meta resolution.ResolveMeta) string {
@@ -61,10 +55,7 @@ func noSourcesHintForFlags(flags ResolveFlags, meta resolution.ResolveMeta) stri
 }
 
 func noSourcesHintForCoord(coord resolve.Coord) string {
-	if coord.Version != "" {
-		return fmt.Sprintf("Try: ksrc fetch %s to download sources.", coord.String())
-	}
-	return "Try: ksrc deps (list resolved coords), then ksrc fetch <coord> to download sources."
+	return adapter.NoSourcesHintForCoord(coord)
 }
 
 func joinHints(parts ...string) string {
@@ -111,19 +102,7 @@ func metaHasConfig(meta resolution.ResolveMeta, pattern string) bool {
 }
 
 func emitDiagnostics(cmd stderrWriter, meta resolution.ResolveMeta, verbose bool) {
-	for _, warning := range meta.Warnings {
-		fmt.Fprintf(cmd.ErrOrStderr(), "WARN: %s\n", warning)
-	}
-	if !verbose {
-		return
-	}
-	for _, line := range meta.Verbose {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		fmt.Fprintf(cmd.ErrOrStderr(), "VERBOSE: %s\n", line)
-	}
+	adapter.WriteDiagnostics(cmd.ErrOrStderr(), meta, verbose)
 }
 
 type stderrWriter interface {

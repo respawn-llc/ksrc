@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
@@ -29,12 +30,11 @@ func newWhereCmd(app *App) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				jarPath, err := findJarByCoord(sources, coord)
+				jarPath, err := adapter.FindJarByCoord(sources, coord, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", resolve.FormatFileID(coord, inner), jarPath)
-				return nil
+				return adapter.WriteFileIDPath(cmd.OutOrStdout(), resolve.FormatFileID(coord, inner), jarPath)
 			}
 
 			if coord, err := resolve.ParseCoord(arg); err == nil {
@@ -52,12 +52,11 @@ func newWhereCmd(app *App) *cobra.Command {
 				if len(sources) == 0 {
 					return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 				}
-				jarPath, err := findJarByCoord(sources, coord)
+				jarPath, err := adapter.FindJarByCoord(sources, coord, adapter.NoSourcesHintForCoord(coord))
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", coord.String(), jarPath)
-				return nil
+				return adapter.WriteCoordPath(cmd.OutOrStdout(), coord, jarPath)
 			}
 
 			if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
@@ -72,12 +71,11 @@ func newWhereCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			source, inner, ok := resolve.FindFileInSources(sources, arg)
+			location, ok := adapter.FindFile(sources, arg)
 			if !ok {
 				return fmt.Errorf("file not found in resolved sources: %s. Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id", strings.TrimPrefix(arg, "/"))
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", resolve.FormatFileID(source.Coord, inner), source.Path)
-			return nil
+			return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
 		},
 	}
 

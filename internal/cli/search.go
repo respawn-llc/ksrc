@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/search"
 	"github.com/spf13/cobra"
 )
@@ -71,7 +72,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			if len(sources) == 0 {
 				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
 			}
-			rgExtra := splitCSV(rgArgs)
+			rgExtra := adapter.SplitCSV(rgArgs)
 			if contextLines > 0 {
 				rgExtra = append(rgExtra, "-C", strconv.Itoa(contextLines))
 			}
@@ -79,7 +80,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			var report func(search.ExecPlan)
 			if app.Verbose {
 				report = func(plan search.ExecPlan) {
-					rgLine := fmt.Sprintf("rg: %s %s", plan.Cmd, formatRgArgs(plan))
+					rgLine := fmt.Sprintf("rg: %s %s", plan.Cmd, adapter.FormatRGArgs(plan))
 					emitVerbose(cmd, app.Verbose,
 						rgLine,
 						fmt.Sprintf("rg jars: %d (mode=%s)", plan.JarCount, plan.Mode),
@@ -96,14 +97,7 @@ func newSearchCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for _, m := range matches {
-				if showExtractedPath {
-					fmt.Fprintf(cmd.OutOrStdout(), "%s %s:%d:%d:%s\n", m.FileID, m.File, m.Line, m.Column, m.Text)
-					continue
-				}
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %d:%d:%s\n", m.FileID, m.Line, m.Column, m.Text)
-			}
-			return nil
+			return adapter.WriteSearchMatches(cmd.OutOrStdout(), matches, showExtractedPath)
 		},
 	}
 
@@ -134,14 +128,4 @@ func hasSelector(flags ResolveFlags) bool {
 		strings.TrimSpace(flags.Group) != "" ||
 		strings.TrimSpace(flags.Artifact) != "" ||
 		strings.TrimSpace(flags.Version) != ""
-}
-
-func formatRgArgs(plan search.ExecPlan) string {
-	args := plan.Args
-	if plan.JarCount > 0 && len(args) >= plan.JarCount {
-		trimmed := append([]string{}, args[:len(args)-plan.JarCount]...)
-		trimmed = append(trimmed, fmt.Sprintf("<%d jars>", plan.JarCount))
-		return strings.Join(trimmed, " ")
-	}
-	return strings.Join(args, " ")
 }

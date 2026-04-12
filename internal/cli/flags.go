@@ -1,8 +1,7 @@
 package cli
 
 import (
-	"strings"
-
+	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/gradle"
 	"github.com/respawn-app/ksrc/internal/resolution"
 )
@@ -34,8 +33,8 @@ func (f ResolveFlags) ToOptions() gradle.ResolveOptions {
 		Artifact:              f.Artifact,
 		Version:               f.Version,
 		Scope:                 f.Scope,
-		Configs:               splitCSV(f.Config),
-		Targets:               splitCSV(f.Targets),
+		Configs:               adapter.SplitCSV(f.Config),
+		Targets:               adapter.SplitCSV(f.Targets),
 		Subprojects:           f.Subprojects,
 		Offline:               f.Offline,
 		Refresh:               f.Refresh,
@@ -46,15 +45,19 @@ func (f ResolveFlags) ToOptions() gradle.ResolveOptions {
 }
 
 func (f ResolveFlags) ToRequest(dep string, applyFilters bool, allowCacheFallback bool) resolution.Request {
-	return resolution.Request{
+	return adapter.BuildRequest(f.ToSpec(dep, applyFilters, allowCacheFallback))
+}
+
+func (f ResolveFlags) ToSpec(dep string, applyFilters bool, allowCacheFallback bool) adapter.ResolveSpec {
+	return adapter.ResolveSpec{
 		Project:               f.Project,
 		Module:                f.Module,
 		Group:                 f.Group,
 		Artifact:              f.Artifact,
 		Version:               f.Version,
 		Scope:                 f.Scope,
-		Config:                f.Config,
-		Targets:               f.Targets,
+		Config:                adapter.SplitCSV(f.Config),
+		Targets:               adapter.SplitCSV(f.Targets),
 		Subprojects:           f.Subprojects,
 		Offline:               f.Offline,
 		Refresh:               f.Refresh,
@@ -66,23 +69,4 @@ func (f ResolveFlags) ToRequest(dep string, applyFilters bool, allowCacheFallbac
 		ApplyFilters:          applyFilters,
 		AllowCacheFallback:    allowCacheFallback,
 	}
-}
-
-func splitCSV(value string) []string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return nil
-	}
-	parts := strings.Split(value, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
 }
