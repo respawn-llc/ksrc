@@ -18,6 +18,13 @@ go vet ./...
 go test ./...
 ```
 
+- Bump dependency sources with:
+```bash
+./scripts/update-dependencies.sh
+```
+This updates Go modules/toolchain, sample and integration Gradle wrappers, the sample Gradle version catalog, Gradle fixture dependency pins, and pinned GitHub Actions.
+Add `--verify` to run format/vet/test/build plus a sample smoke check after updating.
+
 - Rebuild local CLI binary after code changes:
 ```bash
 ./scripts/build.sh

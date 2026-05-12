@@ -113,10 +113,20 @@ $ ksrc cat 'pro.respawn.flowmvi:core:3.3.0-alpha03!/commonMain/pro/respawn/flowm
 
 ```bash
 $ ksrc where kotlinx/datetime/LocalDate.kt --group org.jetbrains.kotlinx --artifact kotlinx-datetime
-org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/kotlinx/datetime/LocalDate.kt|/path/to/kotlinx-datetime-0.7.1-sources.jar
+org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt|/path/to/kotlinx-datetime-0.8.0-sources.jar
 ```
 
 For path lookups, text before `|` uses same `<file-id>` contract as `search`, so you can pass it directly to `ksrc cat` or `ksrc open`.
+
+## Maintenance
+
+To bump dependency version sources in this repository:
+
+```bash
+./scripts/update-dependencies.sh
+```
+
+The script updates Go modules/toolchain, Gradle wrappers, the sample Gradle version catalog, Gradle fixture dependency pins, and pinned GitHub Actions. Add `--verify` to run format/vet/test/build plus a sample smoke check. Set `GITHUB_TOKEN` when GitHub API rate limits are a concern.
 
 ## License
 

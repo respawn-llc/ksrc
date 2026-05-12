@@ -8,12 +8,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/respawn-app/ksrc/internal/executil"
 	"github.com/respawn-app/ksrc/internal/gradle"
+)
+
+var (
+	integrationCatalogDatetimePattern = regexp.MustCompile(`(?m)^kotlinx-datetime\s*=\s*"([^"]+)"\s*$`)
+	integrationBuildDatetimePattern   = regexp.MustCompile(`org\.jetbrains\.kotlinx:kotlinx-datetime:([^'"]+)`)
 )
 
 func TestIntegrationWithRealGradle(t *testing.T) {
@@ -27,12 +33,13 @@ func TestIntegrationWithRealGradle(t *testing.T) {
 	}
 
 	projectDir := filepath.Clean(filepath.Join("..", "..", "testdata", "integration"))
+	datetimeVersion := expectedKotlinxDatetimeVersion(t, projectDir)
 
 	out, err := runCommand(app, []string{"search", "LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir})
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/") {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:"+datetimeVersion+"!/") {
 		t.Fatalf("unexpected search output: %s", out)
 	}
 
@@ -73,6 +80,28 @@ func firstSearchHit(t *testing.T, out string) (string, int) {
 	return "", 0
 }
 
+func expectedKotlinxDatetimeVersion(t *testing.T, projectDir string) string {
+	t.Helper()
+
+	catalogPath := filepath.Join(projectDir, "gradle", "libs.versions.toml")
+	if catalog, err := os.ReadFile(catalogPath); err == nil {
+		if matches := integrationCatalogDatetimePattern.FindSubmatch(catalog); len(matches) > 0 {
+			return string(matches[1])
+		}
+		t.Fatalf("%s: missing kotlinx-datetime version", catalogPath)
+	}
+	buildPath := filepath.Join(projectDir, "build.gradle")
+	build, err := os.ReadFile(buildPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", buildPath, err)
+	}
+	matches := integrationBuildDatetimePattern.FindSubmatch(build)
+	if len(matches) == 0 {
+		t.Fatalf("%s: missing kotlinx-datetime dependency", buildPath)
+	}
+	return string(matches[1])
+}
+
 func TestIntegrationWithSampleKmp(t *testing.T) {
 	if os.Getenv("KSRC_INTEGRATION") != "1" {
 		t.Skip("set KSRC_INTEGRATION=1 to run")
@@ -84,12 +113,13 @@ func TestIntegrationWithSampleKmp(t *testing.T) {
 	}
 
 	projectDir := prepareSampleProject(t)
+	datetimeVersion := expectedKotlinxDatetimeVersion(t, projectDir)
 
 	out, err := runCommand(app, []string{"search", "LocalDate", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir})
 	if err != nil {
 		t.Fatalf("search error: %v", err)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/") {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:"+datetimeVersion+"!/") {
 		t.Fatalf("unexpected search output: %s", out)
 	}
 }
@@ -100,15 +130,16 @@ func TestIntegrationKmpBaseModuleIncludesExternalVariantSources(t *testing.T) {
 	}
 
 	projectDir := prepareSampleProject(t)
+	datetimeVersion := expectedKotlinxDatetimeVersion(t, projectDir)
 
 	out, err := runCommand(NewApp(), []string{"resolve", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir})
 	if err != nil {
 		t.Fatalf("resolve error: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1|") {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime:"+datetimeVersion+"|") {
 		t.Fatalf("expected base/common sources in output:\n%s", out)
 	}
-	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1|") {
+	if !strings.Contains(out, "org.jetbrains.kotlinx:kotlinx-datetime-jvm:"+datetimeVersion+"|") {
 		t.Fatalf("expected JVM external-variant sources in output:\n%s", out)
 	}
 	assertNoDuplicateResolvePaths(t, out)
@@ -190,6 +221,7 @@ func TestIntegrationCLIResolveReusesConfigurationCacheWithIsolatedProjects(t *te
 	}
 
 	projectDir := prepareSampleProject(t)
+	datetimeVersion := expectedKotlinxDatetimeVersion(t, projectDir)
 	runner := &recordingRunner{inner: executil.OSRunner{}}
 	app := &App{Runner: runner, Verbose: true}
 	args := []string{"resolve", "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDir}
@@ -198,7 +230,7 @@ func TestIntegrationCLIResolveReusesConfigurationCacheWithIsolatedProjects(t *te
 	if err != nil {
 		t.Fatalf("first resolve error: %v\n%s", err, firstOut)
 	}
-	if !strings.Contains(firstOut, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1|") {
+	if !strings.Contains(firstOut, "org.jetbrains.kotlinx:kotlinx-datetime:"+datetimeVersion+"|") {
 		t.Fatalf("unexpected first resolve output:\n%s", firstOut)
 	}
 
@@ -206,7 +238,7 @@ func TestIntegrationCLIResolveReusesConfigurationCacheWithIsolatedProjects(t *te
 	if err != nil {
 		t.Fatalf("second resolve error: %v\n%s", err, secondOut)
 	}
-	if !strings.Contains(secondOut, "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1|") {
+	if !strings.Contains(secondOut, "org.jetbrains.kotlinx:kotlinx-datetime:"+datetimeVersion+"|") {
 		t.Fatalf("unexpected second resolve output:\n%s", secondOut)
 	}
 	if len(runner.calls) < 2 {

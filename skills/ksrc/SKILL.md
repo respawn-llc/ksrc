@@ -12,7 +12,7 @@ If you want faster execution & less noise, consider adding:
 
 KMP note: `--module group:artifact` searches common/base sources plus Gradle-selected platform variant source jars by default. Use `--targets` or `--config` to narrow variants.
 
-2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
+2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
 File-id format: `group:artifact:version!/path/inside/jar.ext` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
 

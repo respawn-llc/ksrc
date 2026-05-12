@@ -12,14 +12,14 @@
 - Design: Gradle module metadata `available-at` is surfaced through `ResolvedVariantResult.externalVariant`; ksrc records external variant sources with internal `selectedBy` metadata so base selectors keep those source jars after Go-side filtering.
 - Search duplicate handling: if a selected variant source jar repeats the same matching line from the selected base source jar, search emits the base hit and suppresses the duplicate variant hit.
 
-Sample proof (Gradle 9.4.0, Kotlin 2.3.10, AGP 9.1.0):
-- `desktopMainCompileClasspath` root dependency selects `org.jetbrains.kotlinx:kotlinx-datetime:0.7.1` variant `jvmApiElements-published`.
-- That selected base component has a direct resolved dependency edge to `org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1`.
+Sample proof (Gradle 9.5.1, Kotlin 2.3.21, AGP 9.2.1):
+- `desktopMainCompileClasspath` root dependency selects `org.jetbrains.kotlinx:kotlinx-datetime:0.8.0` variant `jvmApiElements-published`.
+- That selected base component has a direct resolved dependency edge to `org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.8.0`.
 - Edge details from `ResolvedDependencyResult` probe:
-  - root edge: requested `org.jetbrains.kotlinx:kotlinx-datetime:0.7.1`, selected variant `jvmApiElements-published`, attrs include `org.jetbrains.kotlin.platform.type=jvm`, capability `org.jetbrains.kotlinx:kotlinx-datetime:0.7.1`.
-  - base-to-platform edge: requested `org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1`, selected variant `jvmApiElements-published`, attrs include `org.jetbrains.kotlin.platform.type=jvm`, capability `org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.7.1`, `selectionReason=requested`.
+  - root edge: requested `org.jetbrains.kotlinx:kotlinx-datetime:0.8.0`, selected variant `jvmApiElements-published`, attrs include `org.jetbrains.kotlin.platform.type=jvm`, capability `org.jetbrains.kotlinx:kotlinx-datetime:0.8.0`.
+  - base-to-platform edge: requested `org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.8.0`, selected variant `jvmApiElements-published`, attrs include `org.jetbrains.kotlin.platform.type=jvm`, capability `org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.8.0`, `selectionReason=requested`.
   - normal dependency edges from metadata config also have `selectionReason=requested`, so `selectionReason` alone cannot identify platform-variant edges.
-- `artifactView { withVariantReselection(); category=documentation; docsType=sources }` on JVM configs returns `kotlinx-datetime-jvm-0.7.1-sources.jar`.
+- `artifactView { withVariantReselection(); category=documentation; docsType=sources }` on JVM configs returns `kotlinx-datetime-jvm-0.8.0-sources.jar`.
 - Metadata/common configs select base component variant `metadataApiElements`; artifact view did not return common/base sources in this probe, while legacy detached `classifier: sources` does.
 - Resolved distinction: use `ResolvedVariantResult.externalVariant`; do not infer from dependency edges, selection reasons, names, groups, or suffixes.
 

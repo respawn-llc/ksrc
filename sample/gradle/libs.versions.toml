@@ -1,15 +1,17 @@
 [versions]
-kotlin = "2.3.10"
-agp = "9.1.0"
-kotlinx-datetime = "0.7.1"
+agp = "9.2.1"
 androidCompileSdk = "36"
 androidMinSdk = "28"
 androidTargetSdk = "36"
+kotlin = "2.3.21"
+kotlinx-datetime = "0.8.0"
+versionCatalogUpdatePlugin = "1.1.0"
 
 [plugins]
-kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+version-catalog-update = { id = "nl.littlerobots.version-catalog-update", version.ref = "versionCatalogUpdatePlugin" }
 
 [libraries]
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
