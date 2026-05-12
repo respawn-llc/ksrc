@@ -99,9 +99,10 @@ func TestResolveStopsAfterRootSources(t *testing.T) {
 	}
 }
 
-func TestResolveOncePassesExplicitGradleUserHomeToWrapper(t *testing.T) {
+func TestResolveNormalizesRelativeGradleUserHomeBeforeInvokingWrapper(t *testing.T) {
 	root := t.TempDir()
 	userHome := "relative-gradle-home"
+	wantUserHome := filepath.Join(root, userHome)
 	runner := &scriptedRunner{
 		responses: map[string]runResult{
 			root: {
@@ -124,8 +125,44 @@ func TestResolveOncePassesExplicitGradleUserHomeToWrapper(t *testing.T) {
 	if len(runner.calls) != 1 {
 		t.Fatalf("expected 1 Gradle call, got %d", len(runner.calls))
 	}
-	if !strings.Contains(runner.calls[0], "--gradle-user-home "+userHome) {
+	if !strings.Contains(runner.calls[0], "--gradle-user-home "+wantUserHome) {
 		t.Fatalf("expected --gradle-user-home in args, got %q", runner.calls[0])
+	}
+}
+
+func TestResolveUsesSameRelativeGradleUserHomeForIncludedBuilds(t *testing.T) {
+	root := t.TempDir()
+	included := t.TempDir()
+	wantUserHome := filepath.Join(root, "relative-gradle-home")
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "include", Path: included}),
+			},
+			included: {
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
+			},
+		},
+	}
+
+	_, err := Resolve(context.Background(), runner, ResolveOptions{
+		ProjectDir:            root,
+		GradleUserHome:        "relative-gradle-home",
+		IncludeIncludedBuilds: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 Gradle calls, got %d", len(runner.calls))
+	}
+	for _, call := range runner.calls {
+		if !strings.Contains(call, "--gradle-user-home "+wantUserHome) {
+			t.Fatalf("expected all Gradle calls to share %q, got %q", wantUserHome, call)
+		}
+		if strings.Contains(call, filepath.Join(included, "relative-gradle-home")) {
+			t.Fatalf("included build reinterpreted relative Gradle home: %q", call)
+		}
 	}
 }
 

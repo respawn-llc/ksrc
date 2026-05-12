@@ -101,7 +101,7 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 ## 2026-05-12: Gradle user home is shared resolution state
 - Gradle invocation and Gradle cache fallback use the same effective user home.
 - Precedence is explicit `--gradle-user-home` / MCP `gradleUserHome`, then `GRADLE_USER_HOME`, then Gradle's default `~/.gradle`.
-- Explicit values are passed raw to Gradle via `--gradle-user-home`; relative paths are resolved against the Gradle working directory only for ksrc's cache lookup.
+- Explicit values are resolved once against the root Gradle working directory before being passed to Gradle via `--gradle-user-home`; cache fallback uses the same effective location.
 - Rationale: preserve Gradle semantics while keeping cache-only fallback consistent with where Gradle downloads source artifacts.
 
 ## 2026-05-12: Gradle resolution supports Configuration Cache and Isolated Projects
