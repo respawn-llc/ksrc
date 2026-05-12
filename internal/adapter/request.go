@@ -19,6 +19,7 @@ type ResolveSpec struct {
 	IncludeBuildscript    bool
 	IncludeIncludedBuilds bool
 	Dep                   string
+	GradleUserHome        string
 	ApplyFilters          bool
 	AllowCacheFallback    bool
 }
@@ -41,6 +42,7 @@ func BuildRequest(spec ResolveSpec) resolution.Request {
 		IncludeBuildscript:    spec.IncludeBuildscript,
 		IncludeIncludedBuilds: spec.IncludeIncludedBuilds,
 		Dep:                   DefaultString(spec.Dep, ""),
+		GradleUserHome:        DefaultString(spec.GradleUserHome, ""),
 		ApplyFilters:          spec.ApplyFilters,
 		AllowCacheFallback:    spec.AllowCacheFallback,
 	}

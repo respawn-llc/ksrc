@@ -33,6 +33,40 @@ func TestFindCachedSourcesUsesDottedGroupDir(t *testing.T) {
 	}
 }
 
+func TestGradleCacheDirUsesGradleUserHomeEnvRelativeToWorkDir(t *testing.T) {
+	home := t.TempDir()
+	workDir := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "custom-gradle")
+
+	got, err := GradleCacheDirWithOptions(CacheOptions{WorkDir: workDir})
+	if err != nil {
+		t.Fatalf("GradleCacheDirWithOptions error: %v", err)
+	}
+
+	want := filepath.Join(workDir, "custom-gradle", "caches", "modules-2", "files-2.1")
+	if got != want {
+		t.Fatalf("expected cache dir %q, got %q", want, got)
+	}
+}
+
+func TestGradleCacheDirExplicitHomeOverridesEnv(t *testing.T) {
+	workDir := t.TempDir()
+	explicit := filepath.Join(t.TempDir(), "explicit-gradle")
+	t.Setenv("GRADLE_USER_HOME", filepath.Join(t.TempDir(), "env-gradle"))
+
+	got, err := GradleCacheDirWithOptions(CacheOptions{GradleUserHome: explicit, WorkDir: workDir})
+	if err != nil {
+		t.Fatalf("GradleCacheDirWithOptions error: %v", err)
+	}
+
+	want := filepath.Join(explicit, "caches", "modules-2", "files-2.1")
+	if got != want {
+		t.Fatalf("expected cache dir %q, got %q", want, got)
+	}
+}
+
 func TestFindCachedSourcesPrefersHighestQualifiedReleaseWhenVersionOmitted(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -30,6 +30,7 @@ func newDepsCmd(app *App) *cobra.Command {
 	cmd.Flags().StringSliceVar(&flags.Subprojects, "subproject", nil, "limit to subproject (repeatable)")
 	cmd.Flags().BoolVar(&flags.Offline, "offline", false, "offline mode")
 	cmd.Flags().BoolVar(&flags.Refresh, "refresh", false, "refresh dependencies")
+	cmd.Flags().StringVar(&flags.GradleUserHome, "gradle-user-home", "", "Gradle user home (default: GRADLE_USER_HOME or ~/.gradle)")
 	cmd.Flags().BoolVar(&flags.IncludeBuildSrc, "buildsrc", true, "include buildSrc dependencies (set --buildsrc=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeBuildscript, "buildscript", true, "include buildscript classpath dependencies (set --buildscript=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeIncludedBuilds, "include-builds", true, "include composite builds (includeBuild) (set --include-builds=false to disable)")

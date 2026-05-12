@@ -55,6 +55,7 @@ go test -cover ./...
 - `internal/cli/`: Cobra command wiring, flags, and CLI-specific hints.
 - `internal/resolution/`: orchestration layer from CLI to Gradle/cache resolution.
 - `internal/gradle/`: init script generation from versioned embedded Groovy templates, Gradle invocation, traversal (`root -> buildSrc -> included builds`).
+- `internal/gradlehome/`: effective Gradle user home resolution shared by Gradle invocation diagnostics and cache fallback.
 - `internal/resolve/`: cache scanning, coordinate/file-id parsing, filtering/version selection.
 - `internal/search/`: persistent source-jar extraction cache plus `rg --json` output parsing.
 - `internal/cat/`: zip file reads and `--lines` range parsing.
@@ -75,6 +76,7 @@ go test -cover ./...
 - Keep Gradle init scripts as versioned embedded template files under `internal/gradle/templates/`; test template rendering directly and avoid large inline Go string literals.
 - Preserve zero-mutation behavior for target Gradle projects; only temporary files are allowed.
 - Resolution behavior is intentional and documented in `docs/decisions.md`.
+- Gradle user home behavior is API surface: `--gradle-user-home` / MCP `gradleUserHome` override `GRADLE_USER_HOME`; cache fallback must use the same effective home as Gradle invocation.
 - Gradle invocation failures fall back to cache-only resolution with warnings; this is part of UX contract.
 - Search output and file-id contract are API surfaces; keep formats stable and parseable:
   - Search: `<file-id> <line>:<col>:<match>`

@@ -99,6 +99,36 @@ func TestResolveStopsAfterRootSources(t *testing.T) {
 	}
 }
 
+func TestResolveOncePassesExplicitGradleUserHomeToWrapper(t *testing.T) {
+	root := t.TempDir()
+	userHome := "relative-gradle-home"
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
+			},
+		},
+	}
+	if err := os.WriteFile(filepath.Join(root, "gradlew"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write wrapper: %v", err)
+	}
+
+	_, err := Resolve(context.Background(), runner, ResolveOptions{
+		ProjectDir:      root,
+		GradleUserHome:  userHome,
+		IncludeBuildSrc: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected 1 Gradle call, got %d", len(runner.calls))
+	}
+	if !strings.Contains(runner.calls[0], "--gradle-user-home "+userHome) {
+		t.Fatalf("expected --gradle-user-home in args, got %q", runner.calls[0])
+	}
+}
+
 func TestResolveFallsBackToBuildSrc(t *testing.T) {
 	dir := t.TempDir()
 	buildSrcDir := filepath.Join(dir, "buildSrc")

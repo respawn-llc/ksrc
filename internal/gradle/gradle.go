@@ -25,6 +25,7 @@ type ResolveOptions struct {
 	Targets               []string
 	Subprojects           []string
 	Dep                   string
+	GradleUserHome        string
 	Offline               bool
 	Refresh               bool
 	IncludeBuildSrc       bool
@@ -90,6 +91,9 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 	}
 
 	args := []string{"-I", scriptPath, "-Dorg.gradle.console=plain", "--info", "--no-configuration-cache"}
+	if strings.TrimSpace(opts.GradleUserHome) != "" {
+		args = append(args, "--gradle-user-home", opts.GradleUserHome)
+	}
 	if opts.ProjectPath != "" {
 		args = append(args, "-p", opts.ProjectPath)
 	}

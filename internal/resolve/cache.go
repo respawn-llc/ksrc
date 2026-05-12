@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/respawn-app/ksrc/internal/gradlehome"
 )
 
 var errCachedSourcesNotFound = errors.New("sources not found in cache")
@@ -15,16 +17,25 @@ func IsCachedSourcesNotFound(err error) bool {
 	return errors.Is(err, errCachedSourcesNotFound)
 }
 
+type CacheOptions struct {
+	GradleUserHome string
+	WorkDir        string
+}
+
 func GradleCacheDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1"), nil
+	return GradleCacheDirWithOptions(CacheOptions{})
+}
+
+func GradleCacheDirWithOptions(opts CacheOptions) (string, error) {
+	return gradlehome.ModulesCacheDir(opts.GradleUserHome, opts.WorkDir)
 }
 
 func FindCachedSources(group, artifact, version string) ([]SourceJar, error) {
-	cacheDir, err := GradleCacheDir()
+	return FindCachedSourcesWithOptions(group, artifact, version, CacheOptions{})
+}
+
+func FindCachedSourcesWithOptions(group, artifact, version string, opts CacheOptions) ([]SourceJar, error) {
+	cacheDir, err := GradleCacheDirWithOptions(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +62,11 @@ func FindCachedSources(group, artifact, version string) ([]SourceJar, error) {
 }
 
 func FindAllCachedSources() ([]SourceJar, error) {
-	cacheDir, err := GradleCacheDir()
+	return FindAllCachedSourcesWithOptions(CacheOptions{})
+}
+
+func FindAllCachedSourcesWithOptions(opts CacheOptions) ([]SourceJar, error) {
+	cacheDir, err := GradleCacheDirWithOptions(opts)
 	if err != nil {
 		return nil, err
 	}

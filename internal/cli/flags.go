@@ -4,6 +4,7 @@ import (
 	"github.com/respawn-app/ksrc/internal/adapter"
 	"github.com/respawn-app/ksrc/internal/gradle"
 	"github.com/respawn-app/ksrc/internal/resolution"
+	"github.com/respawn-app/ksrc/internal/resolve"
 )
 
 type ResolveFlags struct {
@@ -22,6 +23,7 @@ type ResolveFlags struct {
 	IncludeBuildSrc       bool
 	IncludeBuildscript    bool
 	IncludeIncludedBuilds bool
+	GradleUserHome        string
 }
 
 func (f ResolveFlags) ToOptions() gradle.ResolveOptions {
@@ -41,6 +43,7 @@ func (f ResolveFlags) ToOptions() gradle.ResolveOptions {
 		IncludeBuildSrc:       f.IncludeBuildSrc,
 		IncludeBuildscript:    f.IncludeBuildscript,
 		IncludeIncludedBuilds: f.IncludeIncludedBuilds,
+		GradleUserHome:        f.GradleUserHome,
 	}
 }
 
@@ -66,7 +69,15 @@ func (f ResolveFlags) ToSpec(dep string, applyFilters bool, allowCacheFallback b
 		IncludeBuildscript:    f.IncludeBuildscript,
 		IncludeIncludedBuilds: f.IncludeIncludedBuilds,
 		Dep:                   dep,
+		GradleUserHome:        f.GradleUserHome,
 		ApplyFilters:          applyFilters,
 		AllowCacheFallback:    allowCacheFallback,
+	}
+}
+
+func (f ResolveFlags) ToCacheOptions() resolve.CacheOptions {
+	return resolve.CacheOptions{
+		GradleUserHome: f.GradleUserHome,
+		WorkDir:        f.Project,
 	}
 }

@@ -14,6 +14,7 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 - If Gradle resolution fails, `ksrc` falls back to cache-only resolution and emits a warning.
 - Cache-only mode may return results that don't match the current project; it uses the highest cached source-bearing version under Maven-style version ordering if no version is specified.
 - With `--all`, cache-only mode scans all cached sources (can be large/slow).
+- Gradle user home follows Gradle semantics: `--gradle-user-home <path>` overrides `GRADLE_USER_HOME`; otherwise `GRADLE_USER_HOME` overrides the default `~/.gradle`. Cache fallback uses the same effective user home as Gradle resolution.
 - `E_NO_SOURCES` may suggest `--project <included-build-root>` only when Gradle traversal actually discovered included builds. The CLI does not scan `build.gradle*`/`settings.gradle*` text for Android, KMP, or composite-build hints.
 
 ### `ksrc search <pattern>`
@@ -39,6 +40,7 @@ If no selector is provided, `ksrc` defaults to `--all`. Use `--module`/`--group`
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--refresh`: Re‑resolve and re‑download sources
 - `--offline`: Only use cached sources, error if missing
 - `--context <n>`: Show N lines before/after matches (rg `-C`)
@@ -81,6 +83,7 @@ When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses 
 **Flags**
 - `--project <path>`
 - `--module <glob>` (disambiguate)
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
@@ -101,6 +104,7 @@ When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses 
 **Flags**
 - `--project <path>`
 - `--module <glob>` (disambiguate)
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
@@ -124,6 +128,7 @@ ksrc deps [flags]
 - `--subproject <name>` (repeatable)
 - `--offline`
 - `--refresh`
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
@@ -143,7 +148,9 @@ ksrc fetch org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1
 
 **Flags**
 - `--project <path>` (optional, if resolving via project)
+- `--offline`
 - `--refresh`
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
@@ -183,6 +190,7 @@ For path lookups, the emitted `<file-id>` always uses the resolved `group:artifa
 - `--subproject <name>` (repeatable)
 - `--offline`
 - `--refresh`
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
@@ -209,6 +217,7 @@ ksrc resolve [flags]
 - `--subproject <name>` (repeatable)
 - `--offline`
 - `--refresh`
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 - `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
@@ -217,6 +226,10 @@ ksrc resolve [flags]
 
 ### `ksrc doctor`
 Diagnostics for project detection, Gradle cache accessibility, and source availability.
+
+**Flags**
+- `--project <path>`
+- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
 
 ---
 
@@ -244,6 +257,7 @@ ksrc mcp [flags]
 **Notes**
 - Transport is stdio only; clients should spawn `ksrc mcp` via `mcp.json`.
 - Outputs are plain text matching CLI formats.
+- Resolution tools accept optional `gradleUserHome`, equivalent to CLI `--gradle-user-home`.
 
 ---
 

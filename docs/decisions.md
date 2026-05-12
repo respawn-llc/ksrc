@@ -96,3 +96,9 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - Project hints are limited to included-build roots already discovered by Gradle traversal and surfaced through `resolution.ResolveMeta`.
 - If Gradle fails before traversal yields metadata, no composite-build hint is emitted.
 - Rationale: avoid regex/substring drift as build logic becomes more imperative while keeping monorepo `includeBuild` diagnostics.
+
+## 2026-05-12: Gradle user home is shared resolution state
+- Gradle invocation and Gradle cache fallback use the same effective user home.
+- Precedence is explicit `--gradle-user-home` / MCP `gradleUserHome`, then `GRADLE_USER_HOME`, then Gradle's default `~/.gradle`.
+- Explicit values are passed raw to Gradle via `--gradle-user-home`; relative paths are resolved against the Gradle working directory only for ksrc's cache lookup.
+- Rationale: preserve Gradle semantics while keeping cache-only fallback consistent with where Gradle downloads source artifacts.

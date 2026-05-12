@@ -99,6 +99,7 @@ If you want faster execution & less noise, specify:
 - `--artifact` to limit search to one artifact, (or `--module` to also limit by version)
 - `--subproject` to help discovery for monorepos/large modular apps
 - `--targets` to limit to specific KMP targets. 
+- `--gradle-user-home` if you need to override `GRADLE_USER_HOME`; otherwise `ksrc` respects `GRADLE_USER_HOME` and defaults to `~/.gradle`.
 
 2. When you have found the desired artifact, read the file contents:
 

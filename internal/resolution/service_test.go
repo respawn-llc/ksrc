@@ -257,6 +257,42 @@ func TestResolveSourcesExhaustedAttemptsUseExactSelectorCacheFallback(t *testing
 	}
 }
 
+func TestResolveSourcesCacheFallbackUsesExplicitGradleUserHome(t *testing.T) {
+	projectDir := t.TempDir()
+	gradleHome := filepath.Join(t.TempDir(), "custom-gradle")
+
+	cacheDir := filepath.Join(gradleHome, "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir: %v", err)
+	}
+	jar := filepath.Join(cacheDir, "demo-1.0.0-sources.jar")
+	if err := os.WriteFile(jar, []byte{}, 0o644); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	runner := &scriptedRunner{
+		results: []runResult{{
+			stdout: gradleRecordLine(t, gradleRecord{Type: "dep", Group: "com.example", Artifact: "demo", Version: "1.0.0"}),
+		}},
+	}
+
+	service := Service{Runner: runner}
+	result, err := service.ResolveSources(context.Background(), Request{
+		Project:            projectDir,
+		Module:             "com.example:demo:1.0.0",
+		Config:             "compileClasspath",
+		ApplyFilters:       true,
+		AllowCacheFallback: true,
+		GradleUserHome:     gradleHome,
+	})
+	if err != nil {
+		t.Fatalf("ResolveSources error: %v", err)
+	}
+	if len(result.Sources) != 1 || result.Sources[0].Path != jar {
+		t.Fatalf("expected cached source %q, got %+v", jar, result.Sources)
+	}
+}
+
 func TestResolveSourcesAllMergesCacheFallbackOnGradleFailure(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

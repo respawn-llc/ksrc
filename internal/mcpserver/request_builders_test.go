@@ -15,6 +15,7 @@ func TestBuildSearchSpecMatchesCLIRequest(t *testing.T) {
 		Config:      []string{" compileClasspath ", "", " *debugCompileClasspath "},
 		Targets:     []string{" jvm ", "", " iosArm64 "},
 		Subprojects: []string{" app ", "", " lib "},
+		GradleHome:  " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildSearchRequestForTest(input)
@@ -23,6 +24,7 @@ func TestBuildSearchSpecMatchesCLIRequest(t *testing.T) {
 		Config:                " compileClasspath , , *debugCompileClasspath ",
 		Targets:               " jvm , , iosArm64 ",
 		Subprojects:           input.Subprojects,
+		GradleUserHome:        input.GradleHome,
 		All:                   true,
 		IncludeBuildSrc:       true,
 		IncludeBuildscript:    true,
@@ -43,6 +45,7 @@ func TestBuildCatSpecMatchesCLIRequest(t *testing.T) {
 		Subprojects:   []string{" shared ", ""},
 		Buildscript:   &buildscript,
 		IncludeBuilds: nil,
+		GradleHome:    " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildCatRequestForTest(input, coord)
@@ -54,6 +57,7 @@ func TestBuildCatSpecMatchesCLIRequest(t *testing.T) {
 		Config:                " runtimeClasspath ",
 		Targets:               " jvm ",
 		Subprojects:           input.Subprojects,
+		GradleUserHome:        input.GradleHome,
 		IncludeBuildSrc:       true,
 		IncludeBuildscript:    false,
 		IncludeIncludedBuilds: true,
@@ -76,6 +80,7 @@ func TestBuildResolveSpecMatchesCLIRequest(t *testing.T) {
 		Subprojects:   []string{" shared ", ""},
 		Buildsrc:      &buildsrc,
 		IncludeBuilds: &includeBuilds,
+		GradleHome:    " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildResolveRequestForTest(input)
@@ -88,6 +93,7 @@ func TestBuildResolveSpecMatchesCLIRequest(t *testing.T) {
 		Config:                " runtimeClasspath ",
 		Targets:               " jvm ",
 		Subprojects:           input.Subprojects,
+		GradleUserHome:        input.GradleHome,
 		IncludeBuildSrc:       false,
 		IncludeBuildscript:    true,
 		IncludeIncludedBuilds: false,
@@ -105,6 +111,7 @@ func TestBuildDepsSpecMatchesCLIRequest(t *testing.T) {
 		Targets:     []string{" jvm ", ""},
 		Subprojects: []string{" shared ", ""},
 		Buildscript: &buildscript,
+		GradleHome:  " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildDepsRequestForTest(input)
@@ -114,6 +121,7 @@ func TestBuildDepsSpecMatchesCLIRequest(t *testing.T) {
 		Config:                " runtimeClasspath ",
 		Targets:               " jvm ",
 		Subprojects:           input.Subprojects,
+		GradleUserHome:        input.GradleHome,
 		IncludeBuildSrc:       true,
 		IncludeBuildscript:    false,
 		IncludeIncludedBuilds: true,
@@ -128,6 +136,7 @@ func TestBuildFetchSpecMatchesCLIRequest(t *testing.T) {
 	input := mcpserver.FetchInput{
 		Project:     " ./sample ",
 		Buildscript: &buildscript,
+		GradleHome:  " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildFetchRequestForTest(input, coord)
@@ -135,6 +144,7 @@ func TestBuildFetchSpecMatchesCLIRequest(t *testing.T) {
 		Project:               input.Project,
 		Module:                coord.String(),
 		Version:               coord.Version,
+		GradleUserHome:        input.GradleHome,
 		IncludeBuildSrc:       true,
 		IncludeBuildscript:    false,
 		IncludeIncludedBuilds: true,
@@ -156,6 +166,7 @@ func TestBuildWhereCoordSpecMatchesCLIRequest(t *testing.T) {
 		Buildsrc:      &buildsrc,
 		Buildscript:   &buildscript,
 		IncludeBuilds: nil,
+		GradleHome:    " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildWhereCoordRequestForTest(input, coord, coord.String())
@@ -167,6 +178,7 @@ func TestBuildWhereCoordSpecMatchesCLIRequest(t *testing.T) {
 		Config:                " runtimeClasspath ",
 		Targets:               " jvm ",
 		Subprojects:           input.Subprojects,
+		GradleUserHome:        input.GradleHome,
 		IncludeBuildSrc:       false,
 		IncludeBuildscript:    false,
 		IncludeIncludedBuilds: true,
@@ -185,6 +197,7 @@ func TestBuildWhereSelectorSpecMatchesCLIRequest(t *testing.T) {
 		Subprojects:   []string{" shared ", ""},
 		Buildsrc:      &buildsrc,
 		IncludeBuilds: nil,
+		GradleHome:    " .gradle-custom ",
 	}
 
 	got := mcpserver.BuildWhereSelectorRequestForTest(input, " org.jetbrains.kotlinx ", " kotlinx-datetime ", " 0.7.1 ", "")
@@ -197,6 +210,7 @@ func TestBuildWhereSelectorSpecMatchesCLIRequest(t *testing.T) {
 		Config:                " runtimeClasspath ",
 		Targets:               " jvm ",
 		Subprojects:           input.Subprojects,
+		GradleUserHome:        input.GradleHome,
 		IncludeBuildSrc:       false,
 		IncludeBuildscript:    true,
 		IncludeIncludedBuilds: true,
