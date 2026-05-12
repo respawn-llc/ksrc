@@ -455,6 +455,43 @@ func TestWriteInitScriptFallsBackToTempDirWhenUserCacheUnavailable(t *testing.T)
 	}
 }
 
+func TestWriteInitScriptFallsBackToTempDirWhenUserCacheReadOnly(t *testing.T) {
+	home := t.TempDir()
+	cacheRoot := filepath.Join(home, ".cache")
+	cacheDir := filepath.Join(cacheRoot, "ksrc", "gradle-init")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(cacheDir, 0o755)
+	})
+	if err := os.Chmod(cacheDir, 0o555); err != nil {
+		t.Fatalf("chmod cache dir: %v", err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", cacheRoot)
+
+	path, cleanup, err := writeInitScriptContent("v-test", "println 'fallback read-only'\n")
+	if err != nil {
+		t.Fatalf("write fallback init script: %v", err)
+	}
+	defer cleanup()
+
+	if strings.HasPrefix(path, cacheDir) {
+		t.Fatalf("expected fallback init script outside read-only cache dir, got %q", path)
+	}
+	if !strings.HasPrefix(path, os.TempDir()) {
+		t.Fatalf("expected fallback init script under temp dir, got %q", path)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fallback init script: %v", err)
+	}
+	if string(got) != "println 'fallback read-only'\n" {
+		t.Fatalf("unexpected fallback init script content: %q", got)
+	}
+}
+
 type scriptedRunner struct {
 	responses map[string]runResult
 	calls     []string

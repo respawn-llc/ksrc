@@ -377,20 +377,38 @@ func writeInitScript() (string, func(), error) {
 }
 
 func writeInitScriptContent(version string, script string) (string, func(), error) {
-	hash := sha256.Sum256([]byte(script))
 	dir, cleanupDir, err := initScriptCacheDir()
 	if err != nil {
 		return "", nil, err
 	}
-	cleanupOnError := cleanupDir
+	path, err := writeInitScriptContentToDir(dir, version, script)
+	if err == nil {
+		return path, cleanupDir, nil
+	}
+	cleanupDir()
+
+	fallbackDir, fallbackErr := os.MkdirTemp("", "ksrc-gradle-init-*")
+	if fallbackErr != nil {
+		return "", nil, err
+	}
+	fallbackCleanup := func() { _ = os.RemoveAll(fallbackDir) }
+	path, fallbackWriteErr := writeInitScriptContentToDir(fallbackDir, version, script)
+	if fallbackWriteErr != nil {
+		fallbackCleanup()
+		return "", nil, fmt.Errorf("write Gradle init script in cache dir %s: %w; fallback temp dir failed: %v", dir, err, fallbackWriteErr)
+	}
+	return path, fallbackCleanup, nil
+}
+
+func writeInitScriptContentToDir(dir string, version string, script string) (string, error) {
+	hash := sha256.Sum256([]byte(script))
 	path := filepath.Join(dir, "ksrc-init-"+version+"-"+hex.EncodeToString(hash[:8])+".gradle")
 	if existing, err := os.ReadFile(path); err == nil && string(existing) == script {
-		return path, cleanupDir, nil
+		return path, nil
 	}
 	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
 	if err != nil {
-		cleanupOnError()
-		return "", nil, err
+		return "", err
 	}
 	tmpPath := tmp.Name()
 	cleanupTmp := func() {
@@ -399,24 +417,21 @@ func writeInitScriptContent(version string, script string) (string, func(), erro
 	if _, err := tmp.WriteString(script); err != nil {
 		_ = tmp.Close()
 		cleanupTmp()
-		cleanupOnError()
-		return "", nil, err
+		return "", err
 	}
 	if err := tmp.Close(); err != nil {
 		cleanupTmp()
-		cleanupOnError()
-		return "", nil, err
+		return "", err
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
 		if existing, readErr := os.ReadFile(path); readErr == nil && string(existing) == script {
 			cleanupTmp()
-			return path, cleanupDir, nil
+			return path, nil
 		}
 		cleanupTmp()
-		cleanupOnError()
-		return "", nil, err
+		return "", err
 	}
-	return path, cleanupDir, nil
+	return path, nil
 }
 
 func initScriptCacheDir() (string, func(), error) {
