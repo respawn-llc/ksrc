@@ -74,6 +74,35 @@ func TestMergeResultsIncludesWarnings(t *testing.T) {
 	}
 }
 
+func TestMergeResultsUnionsSelectedByForDuplicateSources(t *testing.T) {
+	coord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
+	jvm := resolve.Coord{Group: "com.example", Artifact: "demo-jvm", Version: "1.0.0"}
+	js := resolve.Coord{Group: "com.example", Artifact: "demo-js", Version: "1.0.0"}
+	base := ResolveResult{
+		Sources: []resolve.SourceJar{{
+			Coord:      coord,
+			Path:       "/tmp/demo-sources.jar",
+			SelectedBy: []resolve.Coord{jvm},
+		}},
+	}
+	extra := ResolveResult{
+		Sources: []resolve.SourceJar{{
+			Coord:      coord,
+			Path:       "/tmp/demo-sources.jar",
+			SelectedBy: []resolve.Coord{jvm, js},
+		}},
+	}
+
+	merged := mergeResults(base, extra)
+	if len(merged.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(merged.Sources))
+	}
+	want := []resolve.Coord{jvm, js}
+	if !reflect.DeepEqual(merged.Sources[0].SelectedBy, want) {
+		t.Fatalf("unexpected selectedBy: %+v", merged.Sources[0].SelectedBy)
+	}
+}
+
 func TestResolveStopsAfterRootSources(t *testing.T) {
 	root := t.TempDir()
 	runner := &scriptedRunner{

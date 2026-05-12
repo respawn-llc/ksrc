@@ -215,16 +215,17 @@ func mergeResults(base ResolveResult, extra ResolveResult) ResolveResult {
 	if len(extra.Sources) == 0 && len(extra.Deps) == 0 && len(extra.IncludedBuilds) == 0 && len(extra.Warnings) == 0 && len(extra.Verbose) == 0 {
 		return base
 	}
-	seenSources := make(map[string]struct{}, len(base.Sources))
-	for _, s := range base.Sources {
-		seenSources[s.Coord.String()+"|"+s.Path] = struct{}{}
+	seenSources := make(map[string]int, len(base.Sources))
+	for i, s := range base.Sources {
+		seenSources[s.Coord.String()+"|"+s.Path] = i
 	}
 	for _, s := range extra.Sources {
 		key := s.Coord.String() + "|" + s.Path
-		if _, ok := seenSources[key]; ok {
+		if index, ok := seenSources[key]; ok {
+			base.Sources[index].SelectedBy = mergeSelectedBy(base.Sources[index].SelectedBy, s.SelectedBy)
 			continue
 		}
-		seenSources[key] = struct{}{}
+		seenSources[key] = len(base.Sources)
 		base.Sources = append(base.Sources, s)
 	}
 
@@ -279,6 +280,25 @@ func mergeResults(base ResolveResult, extra ResolveResult) ResolveResult {
 			seenVerbose[line] = struct{}{}
 			base.Verbose = append(base.Verbose, line)
 		}
+	}
+	return base
+}
+
+func mergeSelectedBy(base []resolve.Coord, extra []resolve.Coord) []resolve.Coord {
+	if len(extra) == 0 {
+		return base
+	}
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	for _, coord := range base {
+		seen[coord.String()] = struct{}{}
+	}
+	for _, coord := range extra {
+		key := coord.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		base = append(base, coord)
 	}
 	return base
 }

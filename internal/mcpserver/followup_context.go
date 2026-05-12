@@ -4,6 +4,7 @@ import "strings"
 
 func catInputHasExplicitResolutionContext(input CatInput) bool {
 	return strings.TrimSpace(input.Project) != "" ||
+		strings.TrimSpace(input.GradleHome) != "" ||
 		strings.TrimSpace(input.Scope) != "" ||
 		len(cleanList(input.Config)) > 0 ||
 		len(cleanList(input.Targets)) > 0 ||
@@ -15,6 +16,7 @@ func catInputHasExplicitResolutionContext(input CatInput) bool {
 
 func whereInputHasExplicitFileIDContext(input WhereInput) bool {
 	return strings.TrimSpace(input.Project) != "" ||
+		strings.TrimSpace(input.GradleHome) != "" ||
 		strings.TrimSpace(input.Scope) != "" ||
 		len(cleanList(input.Config)) > 0 ||
 		len(cleanList(input.Targets)) > 0 ||

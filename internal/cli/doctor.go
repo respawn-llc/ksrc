@@ -40,9 +40,9 @@ func newDoctorCmd(app *App) *cobra.Command {
 
 			home, err := gradlehome.Resolve(userHome, project)
 			if err != nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "gradle user home: error: %v\n", err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "gradle user home: error: %v\n", err)
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "gradle user home: %s (%s)\n", home.Path, home.Source)
+				fmt.Fprintf(cmd.ErrOrStderr(), "gradle user home: %s (%s)\n", home.Path, home.Source)
 			}
 
 			cache, err := resolve.GradleCacheDirWithOptions(resolve.CacheOptions{GradleUserHome: userHome, WorkDir: project})

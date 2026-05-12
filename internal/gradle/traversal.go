@@ -22,11 +22,6 @@ func (f resolveOnceFunc) ResolveOnce(ctx context.Context, runner executil.Runner
 }
 
 func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (ResolveResult, error) {
-	normalizedOpts, err := normalizeTraversalOptions(opts)
-	if err != nil {
-		return ResolveResult{}, err
-	}
-	opts = normalizedOpts
 	return resolveWith(ctx, runner, opts, resolveOnceFunc(resolveOnce))
 }
 

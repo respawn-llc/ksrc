@@ -278,13 +278,11 @@ func runGradleKsrcSourcesWithProps(t *testing.T, projectDir string, scriptPath s
 		"--configuration-cache",
 		"--info",
 	)
-	cmd := exec.Command(filepath.Join(projectDir, "gradlew"), args...)
-	cmd.Dir = projectDir
-	out, err := cmd.CombinedOutput()
+	stdout, stderr, err := executil.OSRunner{}.Run(context.Background(), projectDir, filepath.Join(projectDir, "gradlew"), args...)
 	if err != nil {
-		t.Fatalf("gradle %s failed: %v\n%s", gradle.KsrcGradleTaskName(), err, string(out))
+		t.Fatalf("gradle %s failed: %v\n%s\n%s", gradle.KsrcGradleTaskName(), err, stdout, stderr)
 	}
-	return string(out)
+	return stdout + "\n" + stderr
 }
 
 func assertIncludedBuildRecord(t *testing.T, out string, includedDir string) {
@@ -484,14 +482,12 @@ func updateCatalogVersion(path string, key string, version string) error {
 }
 
 func runGradleWrapper(projectDir string, version string) error {
-	if _, err := exec.LookPath("gradle"); err != nil {
+	runner := executil.OSRunner{}
+	if _, err := runner.LookPath("gradle"); err != nil {
 		return fmt.Errorf("gradle not found on PATH: %w", err)
 	}
-	cmd := exec.Command("gradle", "wrapper", "--gradle-version", version)
-	cmd.Dir = projectDir
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-	return cmd.Run()
+	_, _, err := runner.Run(context.Background(), projectDir, "gradle", "wrapper", "--gradle-version", version)
+	return err
 }
 
 func copyDir(src string, dst string, skip map[string]struct{}) error {

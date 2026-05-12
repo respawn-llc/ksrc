@@ -1,6 +1,7 @@
 package depupdate
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,7 +76,7 @@ func UpdateGitHubActions(workflowDir string, options GitHubActionsOptions) ([]st
 	latestByRepo := make(map[string]string, len(repoNames))
 	var failures []string
 	for _, repo := range repoNames {
-		latest, err := latestStableTag(client, strings.TrimRight(baseURL, "/"), repo, options.Token)
+		latest, err := latestStableTag(context.Background(), client, strings.TrimRight(baseURL, "/"), repo, options.Token)
 		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s: %v", repo, err))
 			continue
@@ -147,12 +148,12 @@ func repoFromAction(action string) string {
 	return parts[0] + "/" + parts[1]
 }
 
-func latestStableTag(client *http.Client, baseURL string, repo string, token string) (string, error) {
+func latestStableTag(ctx context.Context, client *http.Client, baseURL string, repo string, token string) (string, error) {
 	var bestName string
 	var best semver
 	for page := 1; page <= 10; page++ {
 		url := fmt.Sprintf("%s/repos/%s/tags?per_page=100&page=%d", baseURL, repo, page)
-		req, err := http.NewRequest(http.MethodGet, url, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
 			return "", err
 		}

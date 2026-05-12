@@ -77,7 +77,7 @@ func TestUpdateGitHubActionsDoesNotWriteWhenResolutionFails(t *testing.T) {
 func newTagServer(t *testing.T, tagsByRepo map[string]string) *httptest.Server {
 	t.Helper()
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		repo := strings.TrimPrefix(r.URL.Path, "/repos/")
 		repo = strings.TrimSuffix(repo, "/tags")
 		tags, ok := tagsByRepo[repo]
@@ -87,6 +87,8 @@ func newTagServer(t *testing.T, tagsByRepo map[string]string) *httptest.Server {
 		}
 		_, _ = w.Write([]byte(tags))
 	}))
+	t.Cleanup(server.Close)
+	return server
 }
 
 func writeFile(t *testing.T, path string, content string) {
