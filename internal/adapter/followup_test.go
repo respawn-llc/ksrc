@@ -12,6 +12,7 @@ func TestFindFollowupFileIDLocationFallsBackWhenFileIDCacheLookupFails(t *testin
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	brokenCacheRoot := filepath.Join(t.TempDir(), "cache-root-file")
 	if err := os.WriteFile(brokenCacheRoot, []byte("not a directory"), 0o644); err != nil {

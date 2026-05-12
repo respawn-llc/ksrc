@@ -84,6 +84,7 @@ func TestResolveSourcesUsesSelectorCacheFallbackWithLastDeps(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
@@ -126,6 +127,7 @@ func TestResolveSourcesUsesConcreteLastDepForSelectorCacheFallback(t *testing.T)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
@@ -165,6 +167,7 @@ func TestResolveSourcesPrefersFirstMatchingLastDepForSelectorCacheFallback(t *te
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDirA := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
 	if err := os.MkdirAll(cacheDirA, 0o755); err != nil {
@@ -218,6 +221,7 @@ func TestResolveSourcesExhaustedAttemptsUseExactSelectorCacheFallback(t *testing
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "demo", "1.0.0", "hash")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
@@ -297,6 +301,7 @@ func TestResolveSourcesAllMergesCacheFallbackOnGradleFailure(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1", "com.example", "cached", "2.0.0", "hash")
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
@@ -358,6 +363,7 @@ func TestResolveSourcesAllKeepsMergedResultsWhenCacheFallbackMisses(t *testing.T
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	runner := &scriptedRunner{
 		results: []runResult{

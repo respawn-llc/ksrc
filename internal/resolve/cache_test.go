@@ -10,6 +10,7 @@ func TestFindCachedSourcesUsesDottedGroupDir(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1")
 	jarDir := filepath.Join(cacheDir, "org.jetbrains.kotlinx", "kotlinx-datetime", "1.2.3", "hash")
@@ -71,6 +72,7 @@ func TestFindCachedSourcesPrefersHighestQualifiedReleaseWhenVersionOmitted(t *te
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1")
 	versions := []string{"1.2.0-alpha01", "1.2.0-rc1", "1.2.0"}
@@ -101,6 +103,7 @@ func TestFindCachedSourcesSkipsHigherVersionsWithoutSourcesWhenVersionOmitted(t 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1")
 	emptyDir := filepath.Join(cacheDir, "org.jetbrains.kotlinx", "kotlinx-datetime", "1.2.0", "hash")
@@ -136,6 +139,7 @@ func TestFindCachedSourcesTreatsUnderscoreQualifierAsPrereleaseWhenVersionOmitte
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	cacheDir := filepath.Join(home, ".gradle", "caches", "modules-2", "files-2.1")
 	versions := []string{"1.0_rc1", "1.0"}

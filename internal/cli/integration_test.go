@@ -85,6 +85,7 @@ func TestSearchAndCatIntegrationReusesTrackedFileIDAcrossCWD(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	setTestJarEnv(t, jarPath)
 	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
