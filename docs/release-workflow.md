@@ -31,11 +31,16 @@ Trigger the workflow:
 
 What it does:
 1. Reads `VERSION` and computes the tag `vX.Y.Z`.
-2. Creates the git tag (if missing) and pushes it.
-3. Builds release binaries for all OS/arch pairs and uploads them to a draft GitHub release.
-4. Updates the Homebrew tap by opening a PR in `respawn-app/homebrew-tap`:
+2. If `vX.Y.Z` already exists, bumps the patch version to the next unused tag, updates `VERSION` and `.claude-plugin/plugin.json`, commits the bump, and pushes it with `OPENSOURCE_PAT`.
+3. Creates the git tag and pushes it. The workflow fails if the selected tag already exists at this point.
+4. Builds release binaries for all OS/arch pairs and uploads them to a draft GitHub release.
+5. Updates the Homebrew tap by opening a PR in `respawn-app/homebrew-tap`:
    - `scripts/update-brew-tap.sh` updates the source tarball URL + sha256.
    - The script also removes any existing `bottle do` block, so bottles are regenerated.
+
+Secrets:
+- `OPENSOURCE_PAT` is required only when the workflow needs to push an automatic patch-version bump.
+- `RESPAWN_BREW_TAP_TOKEN` is required to update `respawn-app/homebrew-tap`.
 
 ## Tap publishing (bottles)
 

@@ -25,15 +25,61 @@ jobs:
           go-version-file: go.mod
           check-latest: true
 
-      - name: Read version
+      - name: Resolve version
         id: version
+        env:
+          RELEASE_REF: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          RELEASE_TOKEN: ${{ secrets.OPENSOURCE_PAT }}
         run: |
+          set -euo pipefail
+
+          tag_exists() {
+            local tag="$1"
+            git rev-parse -q --verify "refs/tags/${tag}" >/dev/null 2>&1 ||
+              git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1
+          }
+
           version="$(tr -d ' \n' < VERSION)"
           if [ -z "$version" ]; then
             echo "VERSION file is empty" >&2
             exit 1
           fi
           version="${version#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must be a semantic version like 1.2.3, got: $version" >&2
+            exit 1
+          fi
+
+          requested_version="$version"
+          tag="v${version}"
+          if tag_exists "$tag"; then
+            IFS=. read -r major minor patch <<< "$version"
+            while tag_exists "v${major}.${minor}.$((patch + 1))"; do
+              patch=$((patch + 1))
+            done
+            version="${major}.${minor}.$((patch + 1))"
+            tag="v${version}"
+
+            echo "Requested tag v${requested_version} already exists; bumping patch version to ${version}."
+            if [ -z "${RELEASE_TOKEN}" ]; then
+              echo "OPENSOURCE_PAT is required to push the automatic release version bump." >&2
+              exit 1
+            fi
+
+            printf '%s\n' "$version" > VERSION
+            if [ -f .claude-plugin/plugin.json ]; then
+              tmp="$(mktemp)"
+              jq --arg version "$version" '.version = $version' .claude-plugin/plugin.json > "$tmp"
+              mv "$tmp" .claude-plugin/plugin.json
+            fi
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add VERSION .claude-plugin/plugin.json
+            git commit -m "release: bump to ${tag}"
+            git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${RELEASE_REF}"
+          fi
+
           tag="v${version}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -42,15 +88,19 @@ jobs:
         env:
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TOKEN: ${{ secrets.OPENSOURCE_PAT || github.token }}
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists"
-          else
-            git tag -a "$TAG" -m "$TAG"
-            git push origin "$TAG"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null 2>&1 ||
+            git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists" >&2
+            exit 1
           fi
+          git tag -a "$TAG" -m "$TAG"
+          git push "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/$TAG"
 
       - name: Build changelog
         id: changelog
