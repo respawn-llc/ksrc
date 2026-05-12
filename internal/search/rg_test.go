@@ -78,6 +78,48 @@ func TestRunUsesExtractedSearch(t *testing.T) {
 	}
 }
 
+func TestRunSuppressesSelectedVariantDuplicateMatches(t *testing.T) {
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	t.Setenv(extractCacheDirEnv, cacheDir)
+	tmp := t.TempDir()
+	baseJar := filepath.Join(tmp, "base.jar")
+	variantJar := filepath.Join(tmp, "variant.jar")
+	writeTestJar(t, baseJar, map[string]string{
+		"commonMain/Demo.kt": "Needle common\n",
+	})
+	writeTestJar(t, variantJar, map[string]string{
+		"commonMain/Demo.kt": "Needle common\n",
+		"jvmMain/DemoJvm.kt": "Needle common\n",
+	})
+
+	baseCoord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
+	variantCoord := resolve.Coord{Group: "com.example", Artifact: "demo-jvm", Version: "1.0.0"}
+	runner := &multiJarRunner{jarCount: 2}
+
+	matches, err := Run(context.Background(), runner, Options{
+		Pattern: "Needle",
+		Jars: []resolve.SourceJar{
+			{Coord: baseCoord, Path: baseJar},
+			{Coord: variantCoord, Path: variantJar, SelectedBy: []resolve.Coord{baseCoord}},
+		},
+		WorkDir: ".",
+	})
+	if err != nil {
+		t.Fatalf("Run error: %v", err)
+	}
+	got := make([]string, 0, len(matches))
+	for _, match := range matches {
+		got = append(got, match.FileID)
+	}
+	want := []string{
+		"com.example:demo:1.0.0!/commonMain/Demo.kt",
+		"com.example:demo-jvm:1.0.0!/jvmMain/DemoJvm.kt",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("unexpected matches:\nwant %v\ngot  %v", want, got)
+	}
+}
+
 func TestRunTreatsExitCodeOneAsNoMatches(t *testing.T) {
 	cacheDir := filepath.Join(t.TempDir(), "cache")
 	t.Setenv(extractCacheDirEnv, cacheDir)
@@ -292,6 +334,30 @@ func (f *fakeRunner) Run(_ context.Context, _ string, name string, args ...strin
 }
 
 func (f *fakeRunner) LookPath(string) (string, error) {
+	return "rg", nil
+}
+
+type multiJarRunner struct {
+	jarCount int
+}
+
+func (r *multiJarRunner) Run(_ context.Context, _ string, name string, args ...string) (string, string, error) {
+	if name != "rg" {
+		return "", "", fmt.Errorf("unexpected command: %s", name)
+	}
+	dirs := args[len(args)-r.jarCount:]
+	var stdout strings.Builder
+	for _, dir := range dirs {
+		stdout.WriteString(rgEventLine(nil, "match", filepath.Join(dir, "commonMain", "Demo.kt"), "Needle common\n", 1, 0))
+		platformPath := filepath.Join(dir, "jvmMain", "DemoJvm.kt")
+		if _, err := os.Stat(platformPath); err == nil {
+			stdout.WriteString(rgEventLine(nil, "match", platformPath, "Needle common\n", 1, 0))
+		}
+	}
+	return stdout.String(), "", nil
+}
+
+func (r *multiJarRunner) LookPath(string) (string, error) {
 	return "rg", nil
 }
 

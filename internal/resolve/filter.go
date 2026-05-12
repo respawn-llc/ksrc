@@ -5,11 +5,20 @@ func FilterSources(sources []SourceJar, module, group, artifact, version string)
 	selector := NewSelector(module, group, artifact, version)
 	out := make([]SourceJar, 0, len(sources))
 	for _, source := range sources {
-		if selector.MatchCoord(source.Coord) {
+		if selector.MatchCoord(source.Coord) || matchesAnySelectedBy(selector, source.SelectedBy) {
 			out = append(out, source)
 		}
 	}
 	return out
+}
+
+func matchesAnySelectedBy(selector Selector, coords []Coord) bool {
+	for _, coord := range coords {
+		if selector.MatchCoord(coord) {
+			return true
+		}
+	}
+	return false
 }
 
 // FilterCoords applies module/group/artifact/version filters to coordinates.

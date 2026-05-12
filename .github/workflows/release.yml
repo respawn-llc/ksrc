@@ -73,8 +73,8 @@ jobs:
                 ext=""
               fi
               out="ksrc_${TAG#v}_${GOOS}_${GOARCH}"
-              env CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-                go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${VERSION}" -o "dist/${out}${ext}" ./cmd/ksrc
+              env KSRC_VERSION="$VERSION" GOOS="$GOOS" GOARCH="$GOARCH" \
+                ./scripts/build.sh --out "dist/${out}${ext}"
               if [ "$GOOS" = "windows" ]; then
                 (cd dist && zip "${out}.zip" "${out}${ext}")
               else

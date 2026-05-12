@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/respawn-app/ksrc/internal/gradle"
 	"github.com/respawn-app/ksrc/internal/testutil"
 )
 
@@ -50,6 +51,16 @@ func TestSearchAndCatIntegration(t *testing.T) {
 	}
 	if strings.TrimSpace(catOut) != "public class LocalDate" {
 		t.Fatalf("unexpected cat output: %q", catOut)
+	}
+}
+
+func TestStaticFixtureUsesGradleInternalTaskName(t *testing.T) {
+	content, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "testdata", "fixture", "gradlew")))
+	if err != nil {
+		t.Fatalf("read fixture gradlew: %v", err)
+	}
+	if !strings.Contains(string(content), fmt.Sprintf(`"$arg" = "%s"`, gradle.KsrcGradleTaskName())) {
+		t.Fatalf("fixture gradlew does not use internal task name %q", gradle.KsrcGradleTaskName())
 	}
 }
 
@@ -768,7 +779,7 @@ func writeFakeGradleProjectWithCoord(projectDir string, group string, artifact s
 	}
 	wrapper := fmt.Sprintf(`#!/bin/sh
 for arg in "$@"; do
-  if [ "$arg" = "ksrcSources" ]; then
+  if [ "$arg" = %q ]; then
     printf '%%s\n' 'KSRCJSON	{"type":"dep","group":"%s","artifact":"%s","version":"%s"}'
     if [ -n "$KSRC_TEST_JAR" ]; then
       printf 'KSRCJSON\t{"type":"source","group":"%s","artifact":"%s","version":"%s","path":"%%s"}\n' "$KSRC_TEST_JAR"
@@ -779,7 +790,7 @@ for arg in "$@"; do
   fi
 done
 exit 0
-`, group, artifact, version, group, artifact, version, group, artifact, version)
+`, gradle.KsrcGradleTaskName(), group, artifact, version, group, artifact, version, group, artifact, version)
 	path := filepath.Join(projectDir, "gradlew")
 	if err := os.WriteFile(path, []byte(wrapper), 0o755); err != nil {
 		return err
@@ -800,12 +811,12 @@ if [ "$GRADLE_USER_HOME" != %q ]; then
   exit 41
 fi
 for arg in "$@"; do
-  if [ "$arg" = "ksrcSources" ]; then
+  if [ "$arg" = %q ]; then
     printf '%%s\n' 'KSRCJSON	{"type":"dep","group":"%s","artifact":"%s","version":"%s"}'
   fi
 done
 exit 0
-`, gradleUserHome, group, artifact, version)
+`, gradleUserHome, gradle.KsrcGradleTaskName(), group, artifact, version)
 	path := filepath.Join(projectDir, "gradlew")
 	if err := os.WriteFile(path, []byte(wrapper), 0o755); err != nil {
 		return err
@@ -837,7 +848,7 @@ while [ "$#" -gt 0 ]; do
       fi
       seen_gradle_user_home=1
       ;;
-    ksrcSources)
+    %s)
       emit_sources=1
       ;;
   esac
@@ -851,7 +862,7 @@ if [ "$emit_sources" = "1" ]; then
   printf '%%s\n' 'KSRCJSON	{"type":"dep","group":"%s","artifact":"%s","version":"%s"}'
 fi
 exit 0
-`, gradleUserHome, group, artifact, version)
+`, gradleUserHome, gradle.KsrcGradleTaskName(), group, artifact, version)
 	path := filepath.Join(projectDir, "gradlew")
 	if err := os.WriteFile(path, []byte(wrapper), 0o755); err != nil {
 		return err

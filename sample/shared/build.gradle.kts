@@ -25,5 +25,6 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
+        val desktopMain by getting
     }
 }

@@ -38,6 +38,7 @@ func ParseCoord(s string) (Coord, error) {
 }
 
 type SourceJar struct {
-	Coord Coord
-	Path  string
+	Coord      Coord
+	Path       string
+	SelectedBy []Coord
 }

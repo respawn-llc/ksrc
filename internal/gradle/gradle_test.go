@@ -245,6 +245,116 @@ func TestResolveParsesMachineReadableRecordsWithPipesInPath(t *testing.T) {
 	}
 }
 
+func TestResolveParsesSourceSelectedByRecords(t *testing.T) {
+	root := t.TempDir()
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{
+					Type:     "source",
+					Group:    "org.jetbrains.kotlinx",
+					Artifact: "kotlinx-datetime-jvm",
+					Version:  "0.7.1",
+					Path:     "/tmp/kotlinx-datetime-jvm-sources.jar",
+					SelectedBy: []outputCoord{
+						{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"},
+					},
+				}),
+			},
+		},
+	}
+	res, err := Resolve(context.Background(), runner, ResolveOptions{ProjectDir: root})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(res.Sources) != 1 {
+		t.Fatalf("expected one source, got %+v", res.Sources)
+	}
+	want := []resolve.Coord{{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"}}
+	if !reflect.DeepEqual(res.Sources[0].SelectedBy, want) {
+		t.Fatalf("unexpected selectedBy: %+v", res.Sources[0].SelectedBy)
+	}
+}
+
+func TestResolveDoesNotDisableConfigurationCache(t *testing.T) {
+	root := t.TempDir()
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {},
+		},
+	}
+	_, err := Resolve(context.Background(), runner, ResolveOptions{ProjectDir: root})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected 1 Gradle call, got %d", len(runner.calls))
+	}
+	if strings.Contains(runner.calls[0], "--no-configuration-cache") {
+		t.Fatalf("expected Gradle args to allow configuration cache, got %q", runner.calls[0])
+	}
+}
+
+func TestWriteInitScriptUsesStableCachePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+
+	first, firstCleanup, err := writeInitScript()
+	if err != nil {
+		t.Fatalf("write first init script: %v", err)
+	}
+	firstCleanup()
+	second, secondCleanup, err := writeInitScript()
+	if err != nil {
+		t.Fatalf("write second init script: %v", err)
+	}
+	secondCleanup()
+
+	if first != second {
+		t.Fatalf("expected stable init script path, got %q and %q", first, second)
+	}
+	if !strings.Contains(filepath.Base(first), initScriptTemplateVersion) {
+		t.Fatalf("expected init script path to include template version, got %q", first)
+	}
+	got, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatalf("read stable init script: %v", err)
+	}
+	if string(got) != InitScript() {
+		t.Fatal("stable init script content differs from rendered init script")
+	}
+}
+
+func TestWriteInitScriptCachePathInvalidatesOnVersionOrContentChange(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+
+	base, baseCleanup, err := writeInitScriptContent("v-test", "println 'one'\n")
+	if err != nil {
+		t.Fatalf("write base init script: %v", err)
+	}
+	baseCleanup()
+	changedContent, changedContentCleanup, err := writeInitScriptContent("v-test", "println 'two'\n")
+	if err != nil {
+		t.Fatalf("write changed-content init script: %v", err)
+	}
+	changedContentCleanup()
+	changedVersion, changedVersionCleanup, err := writeInitScriptContent("v-test-2", "println 'one'\n")
+	if err != nil {
+		t.Fatalf("write changed-version init script: %v", err)
+	}
+	changedVersionCleanup()
+
+	if base == changedContent {
+		t.Fatalf("expected content change to produce new init script path, got %q", base)
+	}
+	if base == changedVersion {
+		t.Fatalf("expected version change to produce new init script path, got %q", base)
+	}
+}
+
 type scriptedRunner struct {
 	responses map[string]runResult
 	calls     []string

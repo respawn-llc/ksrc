@@ -15,6 +15,7 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 - Cache-only mode may return results that don't match the current project; it uses the highest cached source-bearing version under Maven-style version ordering if no version is specified.
 - With `--all`, cache-only mode scans all cached sources (can be large/slow).
 - Gradle user home follows Gradle semantics: `--gradle-user-home <path>` overrides `GRADLE_USER_HOME`; otherwise `GRADLE_USER_HOME` overrides the default `~/.gradle`. Cache fallback uses the same effective user home as Gradle resolution.
+- In KMP projects, a base module selector such as `--module group:artifact` includes common/base sources and Gradle-selected platform variant source jars. `--targets` and `--config` narrow which variants can be selected. Output and file-ids still use each actual source jar coordinate.
 - `E_NO_SOURCES` may suggest `--project <included-build-root>` only when Gradle traversal actually discovered included builds. The CLI does not scan `build.gradle*`/`settings.gradle*` text for Android, KMP, or composite-build hints.
 
 ### `ksrc search <pattern>`

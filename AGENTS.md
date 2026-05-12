@@ -20,9 +20,9 @@ go test ./...
 
 - Rebuild local CLI binary after code changes:
 ```bash
-KSRC_VERSION="$(tr -d ' \n' < VERSION)"
-go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${KSRC_VERSION}" -o ./bin/ksrc ./cmd/ksrc
+./scripts/build.sh
 ```
+Use `./scripts/build.sh --out <path>` or `KSRC_BUILD_OUT=<path> ./scripts/build.sh` to choose a non-default output path.
 
 - Run a fast functional smoke check against the sample project:
 ```bash
@@ -63,9 +63,9 @@ go test -cover ./...
 - `internal/executil/`: command execution abstraction used for testability.
 - `testdata/fixture/`: fake Gradle wrapper test fixture.
 - `testdata/integration/`: real Gradle integration fixture.
-- `sample/`: KMP/Android sample used for smoke coverage.
+- `sample/`: KMP/Android sample with Configuration Cache and Isolated Projects enabled, used for smoke coverage.
 - `docs/`: API spec, decisions, release workflow.
-- `scripts/`: CI format check, install script, brew tap update automation.
+- `scripts/`: local/CI build script, CI format check, install script, brew tap update automation.
 
 ## Dev environment tips
 - Build output version is injected from `VERSION` via ldflags; without that, CLI reports `dev`.
@@ -74,6 +74,7 @@ go test -cover ./...
 ## Architecture Notes
 - Keep command wiring thin in `internal/cli` and `internal/mcpserver`; keep shared source-tool behavior in `internal/adapter` and domain behavior in `resolution`, `gradle`, `resolve`, `search`, and `cat`.
 - Keep Gradle init scripts as versioned embedded template files under `internal/gradle/templates/`; test template rendering directly and avoid large inline Go string literals.
+- Keep ksrc Gradle resolution compatible with Configuration Cache and Isolated Projects; do not disable Configuration Cache globally.
 - Preserve zero-mutation behavior for target Gradle projects; only temporary files are allowed.
 - Resolution behavior is intentional and documented in `docs/decisions.md`.
 - Gradle user home behavior is API surface: `--gradle-user-home` / MCP `gradleUserHome` override `GRADLE_USER_HOME`; cache fallback must use the same effective home as Gradle invocation.

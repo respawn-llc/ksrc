@@ -56,6 +56,7 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 
 ## Performance Notes
 - Each resolution stage starts Gradle and can be slow.
+- Gradle Configuration Cache can make repeated invocations faster when the target build supports it.
 
 ## 2026-01-24: Resolution orchestration split
 - CLI delegates resolution to `internal/resolution` to keep command wiring thin.
@@ -102,3 +103,22 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - Precedence is explicit `--gradle-user-home` / MCP `gradleUserHome`, then `GRADLE_USER_HOME`, then Gradle's default `~/.gradle`.
 - Explicit values are passed raw to Gradle via `--gradle-user-home`; relative paths are resolved against the Gradle working directory only for ksrc's cache lookup.
 - Rationale: preserve Gradle semantics while keeping cache-only fallback consistent with where Gradle downloads source artifacts.
+
+## 2026-05-12: Gradle resolution supports Configuration Cache and Isolated Projects
+- ksrc no longer passes `--no-configuration-cache`; target builds can keep Configuration Cache and Isolated Projects enabled.
+- The init script registers a typed internal `__ksrcSources` task in each project via `gradle.beforeProject` instead of creating one root aggregate task that reaches into subprojects.
+- The invoked task name is intentionally internal to avoid colliding with user-defined `ksrcSources` tasks in root or subprojects.
+- Unselected non-root project tasks are disabled during configuration, so invoking `__ksrcSources` by name does not execute no-op tasks. The root task can still run to emit included-build metadata.
+- Dependency/source records are wired through a project-local `providers.provider` into a plain string task input. The task action only prints stored `KSRCJSON` strings and does not access `Project`.
+- This avoids `afterEvaluate`/`taskGraph.whenReady` resolution and keeps dependency resolution lazy enough for Configuration Cache storage/replay while preserving existing detached `classifier: sources` behavior.
+- The rendered init script is written to a stable user-cache path keyed by template version and content hash, avoiding random temp init-script paths.
+- Tradeoff: the provider still performs project-local dependency introspection when Gradle calculates task input values on a cache miss. Repeated runs can reuse Configuration Cache and replay the stored records.
+
+## 2026-05-12: KMP base selectors include Gradle-selected external variants
+- When a selector matches a resolved KMP base component, the init script inspects Gradle's resolved variant metadata and follows `ResolvedVariantResult.externalVariant` owners exposed from Gradle module metadata `available-at`.
+- ksrc resolves detached `classifier: sources` artifacts for both the matched base component and any Gradle-selected external variant owners. This preserves common/base sources while adding platform source jars selected by Gradle.
+- External variant source records carry internal `selectedBy` coordinates. Go-side source filtering keeps a source jar when either its real coordinate or one of its `selectedBy` coordinates matches the user's selector.
+- Output and file-id formats keep using the actual source artifact coordinate, e.g. `group:artifact-jvm:version`, so chaining remains unambiguous.
+- During extracted search, selected external variant matches are suppressed when the same matching line exists in the selected base source jar. Common duplicate hits therefore use base file-ids while variant-only hits use platform file-ids.
+- `--targets` and `--config` still define which Gradle configurations are inspected; narrowing targets suppresses variants not selected by those configurations.
+- No artifact-name suffix, group/name pattern, or string heuristic is used for variant expansion. Older Gradle versions without `externalVariant` fall back to legacy base classifier source resolution.

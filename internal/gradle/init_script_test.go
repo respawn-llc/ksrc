@@ -52,8 +52,11 @@ func TestInitScriptTemplateIsVersionedAndParameterized(t *testing.T) {
 	}
 	checks := []string{
 		"{{ .SelectorHelpers }}",
-		"root.tasks.register('ksrcSources')",
-		"gradle.settingsEvaluated { settings ->",
+		"abstract class KsrcSourcesTask extends DefaultTask",
+		"gradle.beforeProject { proj ->",
+		"proj.tasks.register('__ksrcSources', KsrcSourcesTask)",
+		"enabled = selectedProject || emitsIncludedBuildRecords",
+		"records.set(proj.providers.provider",
 	}
 	for _, check := range checks {
 		if !strings.Contains(initScriptTemplateSource, check) {
@@ -104,13 +107,19 @@ func TestRenderInitScriptInjectsSelectorHelpers(t *testing.T) {
 	}
 	checks := []string{
 		"import org.gradle.api.artifacts.component.ModuleComponentIdentifier",
-		"root.tasks.register('ksrcSources')",
-		"gradle.settingsEvaluated { settings ->",
+		"abstract class KsrcSourcesTask extends DefaultTask",
+		"gradle.beforeProject { proj ->",
+		"proj.tasks.register('__ksrcSources', KsrcSourcesTask)",
+		"enabled = selectedProject || emitsIncludedBuildRecords",
+		"records.set(proj.providers.provider",
 	}
 	for _, check := range checks {
 		if !strings.Contains(script, check) {
 			t.Fatalf("expected rendered init script to contain %q", check)
 		}
+	}
+	if strings.Contains(script, "tasks.register('ksrcSources'") {
+		t.Fatal("init script must not reserve user-facing ksrcSources task name")
 	}
 }
 

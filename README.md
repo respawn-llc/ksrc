@@ -101,6 +101,8 @@ If you want faster execution & less noise, specify:
 - `--targets` to limit to specific KMP targets. 
 - `--gradle-user-home` if you need to override `GRADLE_USER_HOME`; otherwise `ksrc` respects `GRADLE_USER_HOME` and defaults to `~/.gradle`.
 
+For KMP modules, `--module group:artifact` searches common/base sources plus Gradle-selected platform variant source jars by default. Use `--targets` or `--config` to narrow variants.
+
 2. When you have found the desired artifact, read the file contents:
 
 ```bash
