@@ -166,6 +166,42 @@ func TestResolveUsesSameRelativeGradleUserHomeForIncludedBuilds(t *testing.T) {
 	}
 }
 
+func TestResolveUsesSameRelativeEnvGradleUserHomeForIncludedBuilds(t *testing.T) {
+	root := t.TempDir()
+	included := t.TempDir()
+	t.Setenv("GRADLE_USER_HOME", "relative-env-gradle-home")
+	wantUserHome := filepath.Join(root, "relative-env-gradle-home")
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "include", Path: included}),
+			},
+			included: {
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
+			},
+		},
+	}
+
+	_, err := Resolve(context.Background(), runner, ResolveOptions{
+		ProjectDir:            root,
+		IncludeIncludedBuilds: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 Gradle calls, got %d", len(runner.calls))
+	}
+	for _, call := range runner.calls {
+		if !strings.Contains(call, "--gradle-user-home "+wantUserHome) {
+			t.Fatalf("expected all Gradle calls to share %q, got %q", wantUserHome, call)
+		}
+		if strings.Contains(call, filepath.Join(included, "relative-env-gradle-home")) {
+			t.Fatalf("included build reinterpreted relative Gradle home: %q", call)
+		}
+	}
+}
+
 func TestResolveFallsBackToBuildSrc(t *testing.T) {
 	dir := t.TempDir()
 	buildSrcDir := filepath.Join(dir, "buildSrc")
@@ -389,6 +425,33 @@ func TestWriteInitScriptCachePathInvalidatesOnVersionOrContentChange(t *testing.
 	}
 	if base == changedVersion {
 		t.Fatalf("expected version change to produce new init script path, got %q", base)
+	}
+}
+
+func TestWriteInitScriptFallsBackToTempDirWhenUserCacheUnavailable(t *testing.T) {
+	home := t.TempDir()
+	blockingFile := filepath.Join(t.TempDir(), "cache-root-file")
+	if err := os.WriteFile(blockingFile, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("write blocking cache root: %v", err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", blockingFile)
+
+	path, cleanup, err := writeInitScriptContent("v-test", "println 'fallback'\n")
+	if err != nil {
+		t.Fatalf("write fallback init script: %v", err)
+	}
+	defer cleanup()
+
+	if !strings.HasPrefix(path, os.TempDir()) {
+		t.Fatalf("expected fallback init script under temp dir, got %q", path)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fallback init script: %v", err)
+	}
+	if string(got) != "println 'fallback'\n" {
+		t.Fatalf("unexpected fallback init script content: %q", got)
 	}
 }
 

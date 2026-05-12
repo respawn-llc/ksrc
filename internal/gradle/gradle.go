@@ -377,21 +377,19 @@ func writeInitScript() (string, func(), error) {
 }
 
 func writeInitScriptContent(version string, script string) (string, func(), error) {
-	root, err := os.UserCacheDir()
+	hash := sha256.Sum256([]byte(script))
+	dir, cleanupDir, err := initScriptCacheDir()
 	if err != nil {
 		return "", nil, err
 	}
-	hash := sha256.Sum256([]byte(script))
-	dir := filepath.Join(root, "ksrc", "gradle-init")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", nil, err
-	}
+	cleanupOnError := cleanupDir
 	path := filepath.Join(dir, "ksrc-init-"+version+"-"+hex.EncodeToString(hash[:8])+".gradle")
 	if existing, err := os.ReadFile(path); err == nil && string(existing) == script {
-		return path, func() {}, nil
+		return path, cleanupDir, nil
 	}
 	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
 	if err != nil {
+		cleanupOnError()
 		return "", nil, err
 	}
 	tmpPath := tmp.Name()
@@ -401,19 +399,37 @@ func writeInitScriptContent(version string, script string) (string, func(), erro
 	if _, err := tmp.WriteString(script); err != nil {
 		_ = tmp.Close()
 		cleanupTmp()
+		cleanupOnError()
 		return "", nil, err
 	}
 	if err := tmp.Close(); err != nil {
 		cleanupTmp()
+		cleanupOnError()
 		return "", nil, err
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
 		if existing, readErr := os.ReadFile(path); readErr == nil && string(existing) == script {
 			cleanupTmp()
-			return path, func() {}, nil
+			return path, cleanupDir, nil
 		}
 		cleanupTmp()
+		cleanupOnError()
 		return "", nil, err
 	}
-	return path, func() {}, nil
+	return path, cleanupDir, nil
+}
+
+func initScriptCacheDir() (string, func(), error) {
+	root, err := os.UserCacheDir()
+	if err == nil {
+		dir := filepath.Join(root, "ksrc", "gradle-init")
+		if err := os.MkdirAll(dir, 0o755); err == nil {
+			return dir, func() {}, nil
+		}
+	}
+	dir, err := os.MkdirTemp("", "ksrc-gradle-init-*")
+	if err != nil {
+		return "", nil, err
+	}
+	return dir, func() { _ = os.RemoveAll(dir) }, nil
 }

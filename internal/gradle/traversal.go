@@ -143,7 +143,7 @@ func resolveWith(ctx context.Context, runner executil.Runner, opts ResolveOption
 }
 
 func normalizeTraversalOptions(opts ResolveOptions) (ResolveOptions, error) {
-	if strings.TrimSpace(opts.GradleUserHome) == "" {
+	if strings.TrimSpace(opts.GradleUserHome) == "" && strings.TrimSpace(os.Getenv(gradlehome.EnvName)) == "" {
 		return opts, nil
 	}
 	home, err := gradlehome.Resolve(opts.GradleUserHome, opts.ProjectDir)
