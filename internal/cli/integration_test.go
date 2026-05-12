@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/respawn-app/ksrc/internal/gradle"
 	"github.com/respawn-app/ksrc/internal/testutil"
 )
 
@@ -53,6 +54,16 @@ func TestSearchAndCatIntegration(t *testing.T) {
 	}
 }
 
+func TestStaticFixtureUsesGradleInternalTaskName(t *testing.T) {
+	content, err := os.ReadFile(filepath.Clean(filepath.Join("..", "..", "testdata", "fixture", "gradlew")))
+	if err != nil {
+		t.Fatalf("read fixture gradlew: %v", err)
+	}
+	if !strings.Contains(string(content), fmt.Sprintf(`"$arg" = "%s"`, gradle.KsrcGradleTaskName())) {
+		t.Fatalf("fixture gradlew does not use internal task name %q", gradle.KsrcGradleTaskName())
+	}
+}
+
 func TestSearchAndCatIntegrationReusesTrackedFileIDAcrossCWD(t *testing.T) {
 	app := NewApp()
 	if _, err := app.Runner.LookPath("rg"); err != nil {
@@ -74,6 +85,7 @@ func TestSearchAndCatIntegrationReusesTrackedFileIDAcrossCWD(t *testing.T) {
 	home := filepath.Join(t.TempDir(), "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	setTestJarEnv(t, jarPath)
 	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
@@ -508,6 +520,123 @@ func TestWherePathUsesZipDirectoryEntriesBeforeCatReadsContent(t *testing.T) {
 	}
 }
 
+func TestCommandsUseGradleUserHomeEnvForGradleAndCacheFallback(t *testing.T) {
+	app := NewApp()
+	if _, err := app.Runner.LookPath("rg"); err != nil {
+		t.Skip("rg not available")
+	}
+
+	projectDir := t.TempDir()
+	defaultHome := t.TempDir()
+	gradleHome := filepath.Join(t.TempDir(), "custom-gradle")
+	group := "org.jetbrains.kotlinx"
+	artifact := "kotlinx-datetime"
+	version := "0.7.1"
+	coord := group + ":" + artifact + ":" + version
+	inner := "kotlinx/datetime/LocalDate.kt"
+	cacheDir := filepath.Join(gradleHome, "caches", "modules-2", "files-2.1", group, artifact, version, "hash")
+	jarPath := filepath.Join(cacheDir, artifact+"-"+version+"-sources.jar")
+
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir: %v", err)
+	}
+	if err := writeTestJar(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+	if err := writeGradleUserHomeAwareProject(projectDir, group, artifact, version, gradleHome); err != nil {
+		t.Fatalf("write fake project: %v", err)
+	}
+
+	t.Setenv("HOME", defaultHome)
+	t.Setenv("USERPROFILE", defaultHome)
+	t.Setenv("GRADLE_USER_HOME", gradleHome)
+	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
+
+	searchOut, err := runCommand(app, []string{"search", "public class LocalDate", "--module", coord, "--project", projectDir})
+	if err != nil {
+		t.Fatalf("search error: %v", err)
+	}
+	if !strings.Contains(searchOut, coord+"!/"+inner) {
+		t.Fatalf("unexpected search output: %s", searchOut)
+	}
+
+	whereOut, err := runCommand(app, []string{"where", coord, "--project", projectDir})
+	if err != nil {
+		t.Fatalf("where error: %v", err)
+	}
+	wantWhere := coord + "|" + jarPath + "\n"
+	if whereOut != wantWhere {
+		t.Fatalf("unexpected where output:\nwant: %q\n got: %q", wantWhere, whereOut)
+	}
+
+	catOut, err := runCommand(NewApp(), []string{"cat", coord + "!/" + inner, "--lines", "2,2"})
+	if err != nil {
+		t.Fatalf("cat error: %v", err)
+	}
+	if strings.TrimSpace(catOut) != "public class LocalDate" {
+		t.Fatalf("unexpected cat output: %q", catOut)
+	}
+}
+
+func TestCommandsUseExplicitGradleUserHomeFlagForGradleAndCacheFallback(t *testing.T) {
+	app := NewApp()
+	if _, err := app.Runner.LookPath("rg"); err != nil {
+		t.Skip("rg not available")
+	}
+
+	projectDir := t.TempDir()
+	defaultHome := t.TempDir()
+	envGradleHome := filepath.Join(t.TempDir(), "env-gradle")
+	flagGradleHome := filepath.Join(t.TempDir(), "flag-gradle")
+	group := "org.jetbrains.kotlinx"
+	artifact := "kotlinx-datetime"
+	version := "0.7.1"
+	coord := group + ":" + artifact + ":" + version
+	inner := "kotlinx/datetime/LocalDate.kt"
+	cacheDir := filepath.Join(flagGradleHome, "caches", "modules-2", "files-2.1", group, artifact, version, "hash")
+	jarPath := filepath.Join(cacheDir, artifact+"-"+version+"-sources.jar")
+
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir: %v", err)
+	}
+	if err := writeTestJar(jarPath, inner, "before\npublic class LocalDate\nafter\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+	if err := writeGradleUserHomeFlagAwareProject(projectDir, group, artifact, version, flagGradleHome); err != nil {
+		t.Fatalf("write fake project: %v", err)
+	}
+
+	t.Setenv("HOME", defaultHome)
+	t.Setenv("USERPROFILE", defaultHome)
+	t.Setenv("GRADLE_USER_HOME", envGradleHome)
+	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
+
+	searchOut, err := runCommand(app, []string{"search", "public class LocalDate", "--module", coord, "--project", projectDir, "--gradle-user-home", flagGradleHome})
+	if err != nil {
+		t.Fatalf("search error: %v", err)
+	}
+	if !strings.Contains(searchOut, coord+"!/"+inner) {
+		t.Fatalf("unexpected search output: %s", searchOut)
+	}
+
+	whereOut, err := runCommand(app, []string{"where", coord, "--project", projectDir, "--gradle-user-home", flagGradleHome})
+	if err != nil {
+		t.Fatalf("where error: %v", err)
+	}
+	wantWhere := coord + "|" + jarPath + "\n"
+	if whereOut != wantWhere {
+		t.Fatalf("unexpected where output:\nwant: %q\n got: %q", wantWhere, whereOut)
+	}
+
+	catOut, err := runCommand(app, []string{"cat", coord + "!/" + inner, "--project", projectDir, "--gradle-user-home", flagGradleHome, "--lines", "2,2"})
+	if err != nil {
+		t.Fatalf("cat error: %v", err)
+	}
+	if strings.TrimSpace(catOut) != "public class LocalDate" {
+		t.Fatalf("unexpected cat output: %q", catOut)
+	}
+}
+
 func TestExplicitProjectOverridesTrackedFileIDAcrossDuplicateCoords(t *testing.T) {
 	app := NewApp()
 	projectDirA := t.TempDir()
@@ -651,7 +780,7 @@ func writeFakeGradleProjectWithCoord(projectDir string, group string, artifact s
 	}
 	wrapper := fmt.Sprintf(`#!/bin/sh
 for arg in "$@"; do
-  if [ "$arg" = "ksrcSources" ]; then
+  if [ "$arg" = %q ]; then
     printf '%%s\n' 'KSRCJSON	{"type":"dep","group":"%s","artifact":"%s","version":"%s"}'
     if [ -n "$KSRC_TEST_JAR" ]; then
       printf 'KSRCJSON\t{"type":"source","group":"%s","artifact":"%s","version":"%s","path":"%%s"}\n' "$KSRC_TEST_JAR"
@@ -662,7 +791,79 @@ for arg in "$@"; do
   fi
 done
 exit 0
-`, group, artifact, version, group, artifact, version, group, artifact, version)
+`, gradle.KsrcGradleTaskName(), group, artifact, version, group, artifact, version, group, artifact, version)
+	path := filepath.Join(projectDir, "gradlew")
+	if err := os.WriteFile(path, []byte(wrapper), 0o755); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o755)
+}
+
+func writeGradleUserHomeAwareProject(projectDir string, group string, artifact string, version string, gradleUserHome string) error {
+	if err := os.WriteFile(filepath.Join(projectDir, "settings.gradle.kts"), []byte("rootProject.name = \"fixture\"\n"), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "build.gradle.kts"), []byte("\n"), 0o644); err != nil {
+		return err
+	}
+	wrapper := fmt.Sprintf(`#!/bin/sh
+if [ "$GRADLE_USER_HOME" != %q ]; then
+  echo "unexpected GRADLE_USER_HOME: $GRADLE_USER_HOME" >&2
+  exit 41
+fi
+for arg in "$@"; do
+  if [ "$arg" = %q ]; then
+    printf '%%s\n' 'KSRCJSON	{"type":"dep","group":"%s","artifact":"%s","version":"%s"}'
+  fi
+done
+exit 0
+`, gradleUserHome, gradle.KsrcGradleTaskName(), group, artifact, version)
+	path := filepath.Join(projectDir, "gradlew")
+	if err := os.WriteFile(path, []byte(wrapper), 0o755); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o755)
+}
+
+func writeGradleUserHomeFlagAwareProject(projectDir string, group string, artifact string, version string, gradleUserHome string) error {
+	if err := os.WriteFile(filepath.Join(projectDir, "settings.gradle.kts"), []byte("rootProject.name = \"fixture\"\n"), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "build.gradle.kts"), []byte("\n"), 0o644); err != nil {
+		return err
+	}
+	wrapper := fmt.Sprintf(`#!/bin/sh
+seen_gradle_user_home=0
+emit_sources=0
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --gradle-user-home)
+      shift
+      if [ "$#" -eq 0 ]; then
+        echo "missing --gradle-user-home value" >&2
+        exit 42
+      fi
+      if [ "$1" != %q ]; then
+        echo "unexpected --gradle-user-home: $1" >&2
+        exit 43
+      fi
+      seen_gradle_user_home=1
+      ;;
+    %s)
+      emit_sources=1
+      ;;
+  esac
+  shift
+done
+if [ "$seen_gradle_user_home" != "1" ]; then
+  echo "missing --gradle-user-home" >&2
+  exit 44
+fi
+if [ "$emit_sources" = "1" ]; then
+  printf '%%s\n' 'KSRCJSON	{"type":"dep","group":"%s","artifact":"%s","version":"%s"}'
+fi
+exit 0
+`, gradleUserHome, gradle.KsrcGradleTaskName(), group, artifact, version)
 	path := filepath.Join(projectDir, "gradlew")
 	if err := os.WriteFile(path, []byte(wrapper), 0o755); err != nil {
 		return err

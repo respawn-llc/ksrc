@@ -14,6 +14,7 @@ func TestBuildRequestNormalizesValues(t *testing.T) {
 		Targets:               []string{" jvm ", ""},
 		Subprojects:           []string{" app ", "", "lib "},
 		Dep:                   " org.example:demo:1.0.0 ",
+		GradleUserHome:        " .gradle-custom ",
 		ApplyFilters:          true,
 		AllowCacheFallback:    true,
 		IncludeBuildSrc:       true,
@@ -44,5 +45,8 @@ func TestBuildRequestNormalizesValues(t *testing.T) {
 	}
 	if request.Dep != "org.example:demo:1.0.0" {
 		t.Fatalf("unexpected dep: %q", request.Dep)
+	}
+	if request.GradleUserHome != ".gradle-custom" {
+		t.Fatalf("unexpected gradle user home: %q", request.GradleUserHome)
 	}
 }

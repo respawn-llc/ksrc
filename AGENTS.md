@@ -18,11 +18,18 @@ go vet ./...
 go test ./...
 ```
 
+- Bump dependency sources with:
+```bash
+./scripts/update-dependencies.sh
+```
+This updates Go modules/toolchain, sample and integration Gradle wrappers, the sample Gradle version catalog, Gradle fixture dependency pins, and pinned GitHub Actions.
+Add `--verify` to run format/vet/test/build plus a sample smoke check after updating.
+
 - Rebuild local CLI binary after code changes:
 ```bash
-KSRC_VERSION="$(tr -d ' \n' < VERSION)"
-go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${KSRC_VERSION}" -o ./bin/ksrc ./cmd/ksrc
+./scripts/build.sh
 ```
+Use `./scripts/build.sh --out <path>` or `KSRC_BUILD_OUT=<path> ./scripts/build.sh` to choose a non-default output path.
 
 - Run a fast functional smoke check against the sample project:
 ```bash
@@ -55,6 +62,7 @@ go test -cover ./...
 - `internal/cli/`: Cobra command wiring, flags, and CLI-specific hints.
 - `internal/resolution/`: orchestration layer from CLI to Gradle/cache resolution.
 - `internal/gradle/`: init script generation from versioned embedded Groovy templates, Gradle invocation, traversal (`root -> buildSrc -> included builds`).
+- `internal/gradlehome/`: effective Gradle user home resolution shared by Gradle invocation diagnostics and cache fallback.
 - `internal/resolve/`: cache scanning, coordinate/file-id parsing, filtering/version selection.
 - `internal/search/`: persistent source-jar extraction cache plus `rg --json` output parsing.
 - `internal/cat/`: zip file reads and `--lines` range parsing.
@@ -62,9 +70,9 @@ go test -cover ./...
 - `internal/executil/`: command execution abstraction used for testability.
 - `testdata/fixture/`: fake Gradle wrapper test fixture.
 - `testdata/integration/`: real Gradle integration fixture.
-- `sample/`: KMP/Android sample used for smoke coverage.
+- `sample/`: KMP/Android sample with Configuration Cache and Isolated Projects enabled, used for smoke coverage.
 - `docs/`: API spec, decisions, release workflow.
-- `scripts/`: CI format check, install script, brew tap update automation.
+- `scripts/`: local/CI build script, CI format check, install script, brew tap update automation.
 
 ## Dev environment tips
 - Build output version is injected from `VERSION` via ldflags; without that, CLI reports `dev`.
@@ -73,8 +81,10 @@ go test -cover ./...
 ## Architecture Notes
 - Keep command wiring thin in `internal/cli` and `internal/mcpserver`; keep shared source-tool behavior in `internal/adapter` and domain behavior in `resolution`, `gradle`, `resolve`, `search`, and `cat`.
 - Keep Gradle init scripts as versioned embedded template files under `internal/gradle/templates/`; test template rendering directly and avoid large inline Go string literals.
+- Keep ksrc Gradle resolution compatible with Configuration Cache and Isolated Projects; do not disable Configuration Cache globally.
 - Preserve zero-mutation behavior for target Gradle projects; only temporary files are allowed.
 - Resolution behavior is intentional and documented in `docs/decisions.md`.
+- Gradle user home behavior is API surface: `--gradle-user-home` / MCP `gradleUserHome` override `GRADLE_USER_HOME`; cache fallback must use the same effective home as Gradle invocation.
 - Gradle invocation failures fall back to cache-only resolution with warnings; this is part of UX contract.
 - Search output and file-id contract are API surfaces; keep formats stable and parseable:
   - Search: `<file-id> <line>:<col>:<match>`

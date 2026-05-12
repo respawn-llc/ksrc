@@ -10,7 +10,9 @@ If you want faster execution & less noise, consider adding:
 - `--subproject` to help discovery for monorepos/large modular apps
 - `--targets` to limit to specific KMP targets. 
 
-2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/kotlinx/datetime/LocalDate.kt --lines 1,200`
+KMP note: `--module group:artifact` searches common/base sources plus Gradle-selected platform variant source jars by default. Use `--targets` or `--config` to narrow variants.
+
+2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 
 File-id format: `group:artifact:version!/path/inside/jar.ext` — works for any language in the source JAR (e.g. `.kt`, `.java`, `.groovy`)
 
@@ -23,6 +25,7 @@ Give this tool generous timeouts. It can take a few minutes to download sources 
 - `E_NO_SOURCES`: dependency sources not available; try `ksrc deps`, `ksrc fetch <coord>`, specify a project and scope.
 - Gradle not found: a) run in a Gradle project dir, b) set `--project` path explicitly, c) install gradle on machine.
 - Gradle build script is failing in the repo: `ksrc` falls back to cache-only resolution and warns; when no version is pinned it picks the highest cached source-bearing version under Maven-style ordering. Re-run with `-v` to see Gradle output for debugging.
+- Custom Gradle user home: `ksrc` respects `GRADLE_USER_HOME`. Use `--gradle-user-home <path>` to override it for both Gradle invocation and cache fallback.
 - Gradle fails with unresolved class version: User's Local java in env is resolved to something unsupported by gradle. Help them fix Gradle<>JDK incompatibility.
 - Ambiguous modules: use `--module`, `--group`, or `--artifact` to narrow scope.
 
@@ -51,6 +54,7 @@ Common flags:
 - `--group <glob>` / `--artifact <glob>` / `--version <glob>`
 - `--offline` only use cached sources
 - `--refresh` force dependency refresh
+- `--gradle-user-home <path>` override `GRADLE_USER_HOME` / `~/.gradle`
 - `--context <n>` shortcut for `rg -C <n>` (context lines emit column `0`)
 - `--rg-args <args>` extra rg args (comma‑separated)
 - `-- <rg-args>` pass through raw rg args

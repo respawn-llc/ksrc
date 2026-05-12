@@ -2,6 +2,8 @@ package gradle
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,6 +27,7 @@ type ResolveOptions struct {
 	Targets               []string
 	Subprojects           []string
 	Dep                   string
+	GradleUserHome        string
 	Offline               bool
 	Refresh               bool
 	IncludeBuildSrc       bool
@@ -42,6 +45,11 @@ type ResolveResult struct {
 }
 
 const recordPrefix = "KSRCJSON\t"
+const ksrcGradleTaskName = "__ksrcSources"
+
+func KsrcGradleTaskName() string {
+	return ksrcGradleTaskName
+}
 
 type recordType string
 
@@ -52,11 +60,18 @@ const (
 )
 
 type outputRecord struct {
-	Type     recordType `json:"type"`
-	Group    string     `json:"group,omitempty"`
-	Artifact string     `json:"artifact,omitempty"`
-	Version  string     `json:"version,omitempty"`
-	Path     string     `json:"path,omitempty"`
+	Type       recordType    `json:"type"`
+	Group      string        `json:"group,omitempty"`
+	Artifact   string        `json:"artifact,omitempty"`
+	Version    string        `json:"version,omitempty"`
+	Path       string        `json:"path,omitempty"`
+	SelectedBy []outputCoord `json:"selectedBy,omitempty"`
+}
+
+type outputCoord struct {
+	Group    string `json:"group,omitempty"`
+	Artifact string `json:"artifact,omitempty"`
+	Version  string `json:"version,omitempty"`
 }
 
 func (r outputRecord) coord() (resolve.Coord, bool) {
@@ -64,6 +79,20 @@ func (r outputRecord) coord() (resolve.Coord, bool) {
 		return resolve.Coord{}, false
 	}
 	return resolve.Coord{Group: r.Group, Artifact: r.Artifact, Version: r.Version}, true
+}
+
+func (r outputRecord) selectedByCoords() []resolve.Coord {
+	if len(r.SelectedBy) == 0 {
+		return nil
+	}
+	coords := make([]resolve.Coord, 0, len(r.SelectedBy))
+	for _, selectedBy := range r.SelectedBy {
+		if strings.TrimSpace(selectedBy.Group) == "" || strings.TrimSpace(selectedBy.Artifact) == "" || strings.TrimSpace(selectedBy.Version) == "" {
+			continue
+		}
+		coords = append(coords, resolve.Coord{Group: selectedBy.Group, Artifact: selectedBy.Artifact, Version: selectedBy.Version})
+	}
+	return coords
 }
 
 func parseOutputRecord(line string) (outputRecord, bool) {
@@ -89,7 +118,10 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 		return ResolveResult{}, err
 	}
 
-	args := []string{"-I", scriptPath, "-Dorg.gradle.console=plain", "--info", "--no-configuration-cache"}
+	args := []string{"-I", scriptPath, "-Dorg.gradle.console=plain", "--info"}
+	if strings.TrimSpace(opts.GradleUserHome) != "" {
+		args = append(args, "--gradle-user-home", opts.GradleUserHome)
+	}
 	if opts.ProjectPath != "" {
 		args = append(args, "-p", opts.ProjectPath)
 	}
@@ -100,7 +132,7 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 		args = append(args, "--refresh-dependencies")
 	}
 	args = append(args, buildProps(opts)...) // -P...
-	args = append(args, "ksrcSources")
+	args = append(args, ksrcGradleTaskName)
 
 	result := ResolveResult{}
 	invocation := formatGradleInvocation(gradleCmd, args, opts.ProjectDir, opts.ProjectPath)
@@ -148,7 +180,7 @@ func resolveOnce(ctx context.Context, runner executil.Runner, opts ResolveOption
 				continue
 			}
 			seen[key] = struct{}{}
-			result.Sources = append(result.Sources, resolve.SourceJar{Coord: coord, Path: path})
+			result.Sources = append(result.Sources, resolve.SourceJar{Coord: coord, Path: path, SelectedBy: record.selectedByCoords()})
 		case recordTypeDep:
 			coord, ok := record.coord()
 			if !ok {
@@ -183,16 +215,17 @@ func mergeResults(base ResolveResult, extra ResolveResult) ResolveResult {
 	if len(extra.Sources) == 0 && len(extra.Deps) == 0 && len(extra.IncludedBuilds) == 0 && len(extra.Warnings) == 0 && len(extra.Verbose) == 0 {
 		return base
 	}
-	seenSources := make(map[string]struct{}, len(base.Sources))
-	for _, s := range base.Sources {
-		seenSources[s.Coord.String()+"|"+s.Path] = struct{}{}
+	seenSources := make(map[string]int, len(base.Sources))
+	for i, s := range base.Sources {
+		seenSources[s.Coord.String()+"|"+s.Path] = i
 	}
 	for _, s := range extra.Sources {
 		key := s.Coord.String() + "|" + s.Path
-		if _, ok := seenSources[key]; ok {
+		if index, ok := seenSources[key]; ok {
+			base.Sources[index].SelectedBy = mergeSelectedBy(base.Sources[index].SelectedBy, s.SelectedBy)
 			continue
 		}
-		seenSources[key] = struct{}{}
+		seenSources[key] = len(base.Sources)
 		base.Sources = append(base.Sources, s)
 	}
 
@@ -247,6 +280,25 @@ func mergeResults(base ResolveResult, extra ResolveResult) ResolveResult {
 			seenVerbose[line] = struct{}{}
 			base.Verbose = append(base.Verbose, line)
 		}
+	}
+	return base
+}
+
+func mergeSelectedBy(base []resolve.Coord, extra []resolve.Coord) []resolve.Coord {
+	if len(extra) == 0 {
+		return base
+	}
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	for _, coord := range base {
+		seen[coord.String()] = struct{}{}
+	}
+	for _, coord := range extra {
+		key := coord.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		base = append(base, coord)
 	}
 	return base
 }
@@ -341,21 +393,78 @@ func localWrapperPath(projectDir string) string {
 }
 
 func writeInitScript() (string, func(), error) {
-	file, err := os.CreateTemp("", "ksrc-init-*.gradle")
+	return writeInitScriptContent(initScriptTemplateVersion, InitScript())
+}
+
+func writeInitScriptContent(version string, script string) (string, func(), error) {
+	dir, cleanupDir, err := initScriptCacheDir()
 	if err != nil {
 		return "", nil, err
 	}
-	if _, err := file.WriteString(InitScript()); err != nil {
-		_ = file.Close()
-		_ = os.Remove(file.Name())
+	path, err := writeInitScriptContentToDir(dir, version, script)
+	if err == nil {
+		return path, cleanupDir, nil
+	}
+	cleanupDir()
+
+	fallbackDir, fallbackErr := os.MkdirTemp("", "ksrc-gradle-init-*")
+	if fallbackErr != nil {
 		return "", nil, err
 	}
-	if err := file.Close(); err != nil {
-		_ = os.Remove(file.Name())
+	fallbackCleanup := func() { _ = os.RemoveAll(fallbackDir) }
+	path, fallbackWriteErr := writeInitScriptContentToDir(fallbackDir, version, script)
+	if fallbackWriteErr != nil {
+		fallbackCleanup()
+		return "", nil, fmt.Errorf("write Gradle init script in cache dir %s: %w; fallback temp dir failed: %v", dir, err, fallbackWriteErr)
+	}
+	return path, fallbackCleanup, nil
+}
+
+func writeInitScriptContentToDir(dir string, version string, script string) (string, error) {
+	hash := sha256.Sum256([]byte(script))
+	path := filepath.Join(dir, "ksrc-init-"+version+"-"+hex.EncodeToString(hash[:8])+".gradle")
+	if existing, err := os.ReadFile(path); err == nil && string(existing) == script {
+		return path, nil
+	}
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return "", err
+	}
+	tmpPath := tmp.Name()
+	cleanupTmp := func() {
+		_ = os.Remove(tmpPath)
+	}
+	if _, err := tmp.WriteString(script); err != nil {
+		_ = tmp.Close()
+		cleanupTmp()
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		cleanupTmp()
+		return "", err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		if existing, readErr := os.ReadFile(path); readErr == nil && string(existing) == script {
+			cleanupTmp()
+			return path, nil
+		}
+		cleanupTmp()
+		return "", err
+	}
+	return path, nil
+}
+
+func initScriptCacheDir() (string, func(), error) {
+	root, err := os.UserCacheDir()
+	if err == nil {
+		dir := filepath.Join(root, "ksrc", "gradle-init")
+		if err := os.MkdirAll(dir, 0o755); err == nil {
+			return dir, func() {}, nil
+		}
+	}
+	dir, err := os.MkdirTemp("", "ksrc-gradle-init-*")
+	if err != nil {
 		return "", nil, err
 	}
-	cleanup := func() {
-		_ = os.Remove(file.Name())
-	}
-	return file.Name(), cleanup, nil
+	return dir, func() { _ = os.RemoveAll(dir) }, nil
 }

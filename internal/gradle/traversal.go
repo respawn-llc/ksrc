@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/respawn-app/ksrc/internal/executil"
+	"github.com/respawn-app/ksrc/internal/gradlehome"
 )
 
 type SingleResolver interface {
@@ -25,6 +26,11 @@ func Resolve(ctx context.Context, runner executil.Runner, opts ResolveOptions) (
 }
 
 func resolveWith(ctx context.Context, runner executil.Runner, opts ResolveOptions, resolver SingleResolver) (ResolveResult, error) {
+	normalizedOpts, err := normalizeTraversalOptions(opts)
+	if err != nil {
+		return ResolveResult{}, err
+	}
+	opts = normalizedOpts
 	rootOpts := opts
 	rootOpts.ProjectPath = ""
 	rootOpts.RootDir = opts.ProjectDir
@@ -129,6 +135,18 @@ func resolveWith(ctx context.Context, runner executil.Runner, opts ResolveOption
 	}
 
 	return combined, nil
+}
+
+func normalizeTraversalOptions(opts ResolveOptions) (ResolveOptions, error) {
+	if strings.TrimSpace(opts.GradleUserHome) == "" && strings.TrimSpace(os.Getenv(gradlehome.EnvName)) == "" {
+		return opts, nil
+	}
+	home, err := gradlehome.Resolve(opts.GradleUserHome, opts.ProjectDir)
+	if err != nil {
+		return ResolveOptions{}, err
+	}
+	opts.GradleUserHome = home.Path
+	return opts, nil
 }
 
 func shouldResolveBuildSrc(buildSrcDir string, projectDir string, projectPath string) bool {

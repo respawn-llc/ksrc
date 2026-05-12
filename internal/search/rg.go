@@ -18,12 +18,14 @@ import (
 )
 
 type Match struct {
-	FileID  string
-	JarPath string
-	File    string
-	Line    int
-	Column  int
-	Text    string
+	FileID    string
+	JarPath   string
+	Coord     resolve.Coord
+	File      string
+	InnerPath string
+	Line      int
+	Column    int
+	Text      string
 }
 
 type Options struct {
@@ -154,6 +156,8 @@ func parseRgOutput(stdout string, mapper sourceMapper) rgParseResult {
 		mapped++
 		m.FileID = resolve.FormatFileID(source.Coord, inner)
 		m.JarPath = source.Path
+		m.Coord = source.Coord
+		m.InnerPath = inner
 		matches = append(matches, m)
 	}
 	return rgParseResult{Matches: matches, Parsed: parsed, Mapped: mapped}
@@ -176,12 +180,18 @@ type searchStrategy struct {
 	run  func(context.Context, executil.Runner, Options) ([]Match, error)
 }
 
+type extractedSource struct {
+	Root   string
+	Source resolve.SourceJar
+}
+
 func selectStrategy(context.Context, executil.Runner) searchStrategy {
 	return searchStrategy{mode: "extract", run: runExtractSearch}
 }
 
 func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options) ([]Match, error) {
 	extractRoots := make(map[string]resolve.SourceJar)
+	extractedSources := make([]extractedSource, 0, len(opts.Jars))
 	searchDirs := make([]string, 0, len(opts.Jars))
 	seenDirs := make(map[string]struct{}, len(opts.Jars))
 	for _, j := range opts.Jars {
@@ -190,6 +200,7 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 			return nil, err
 		}
 		extractRoots[dir] = j
+		extractedSources = append(extractedSources, extractedSource{Root: dir, Source: j})
 		if _, ok := seenDirs[dir]; ok {
 			continue
 		}
@@ -225,7 +236,61 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 	parsed := parseRgOutput(stdout, func(filePath string) (resolve.SourceJar, string, bool) {
 		return mapToSource(extractRoots, filePath)
 	})
-	return parsed.Matches, nil
+	return suppressSelectedByDuplicateMatches(parsed.Matches, selectedByCoordsByJarPath(extractedSources)), nil
+}
+
+func selectedByCoordsByJarPath(extractedSources []extractedSource) map[string][]resolve.Coord {
+	coordsByJarPath := make(map[string][]resolve.Coord)
+	for _, extracted := range extractedSources {
+		if len(extracted.Source.SelectedBy) == 0 {
+			continue
+		}
+		coordsByJarPath[extracted.Source.Path] = append(coordsByJarPath[extracted.Source.Path], extracted.Source.SelectedBy...)
+	}
+	return coordsByJarPath
+}
+
+type duplicateMatchKey struct {
+	InnerPath string
+	Line      int
+	Column    int
+	Text      string
+}
+
+func suppressSelectedByDuplicateMatches(matches []Match, selectedByByJarPath map[string][]resolve.Coord) []Match {
+	if len(selectedByByJarPath) == 0 {
+		return matches
+	}
+	matchesByCoord := make(map[resolve.Coord]map[duplicateMatchKey]struct{})
+	for _, match := range matches {
+		coordMatches := matchesByCoord[match.Coord]
+		if coordMatches == nil {
+			coordMatches = make(map[duplicateMatchKey]struct{})
+			matchesByCoord[match.Coord] = coordMatches
+		}
+		coordMatches[duplicateKey(match)] = struct{}{}
+	}
+	filtered := make([]Match, 0, len(matches))
+	for _, match := range matches {
+		if selectedByHasMatch(matchesByCoord, selectedByByJarPath[match.JarPath], duplicateKey(match)) {
+			continue
+		}
+		filtered = append(filtered, match)
+	}
+	return filtered
+}
+
+func duplicateKey(match Match) duplicateMatchKey {
+	return duplicateMatchKey{InnerPath: match.InnerPath, Line: match.Line, Column: match.Column, Text: match.Text}
+}
+
+func selectedByHasMatch(matchesByCoord map[resolve.Coord]map[duplicateMatchKey]struct{}, selectedBy []resolve.Coord, key duplicateMatchKey) bool {
+	for _, coord := range selectedBy {
+		if _, ok := matchesByCoord[coord][key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 type exitCoder interface {

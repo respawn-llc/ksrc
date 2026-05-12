@@ -12,6 +12,7 @@ func TestFindFollowupFileIDLocationFallsBackWhenFileIDCacheLookupFails(t *testin
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	t.Setenv("GRADLE_USER_HOME", "")
 
 	brokenCacheRoot := filepath.Join(t.TempDir(), "cache-root-file")
 	if err := os.WriteFile(brokenCacheRoot, []byte("not a directory"), 0o644); err != nil {
@@ -45,5 +46,35 @@ func TestFindFollowupFileIDLocationFallsBackWhenFileIDCacheLookupFails(t *testin
 	}
 	if location.FileID != resolve.FormatFileID(coord, inner) {
 		t.Fatalf("unexpected file id: %q", location.FileID)
+	}
+}
+
+func TestFindFollowupFileIDLocationUsesCacheOptions(t *testing.T) {
+	defaultHome := t.TempDir()
+	customHome := filepath.Join(t.TempDir(), "custom-gradle")
+	t.Setenv("HOME", defaultHome)
+	t.Setenv("USERPROFILE", defaultHome)
+	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
+
+	coord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
+	inner := "com/example/Demo.kt"
+	jarDir := filepath.Join(customHome, "caches", "modules-2", "files-2.1", coord.Group, coord.Artifact, coord.Version, "hash")
+	if err := os.MkdirAll(jarDir, 0o755); err != nil {
+		t.Fatalf("mkdir jar dir: %v", err)
+	}
+	jarPath := filepath.Join(jarDir, coord.Artifact+"-"+coord.Version+"-sources.jar")
+	if err := writeTestJar(jarPath, inner, "class Demo\n"); err != nil {
+		t.Fatalf("write jar: %v", err)
+	}
+
+	location, found, err := FindFollowupFileIDLocationWithOptions(resolve.FormatFileID(coord, inner), resolve.CacheOptions{GradleUserHome: customHome})
+	if err != nil {
+		t.Fatalf("FindFollowupFileIDLocationWithOptions error: %v", err)
+	}
+	if !found {
+		t.Fatal("expected follow-up file-id lookup to find custom Gradle cache")
+	}
+	if location.Source.Path != jarPath {
+		t.Fatalf("unexpected jar path: %q", location.Source.Path)
 	}
 }

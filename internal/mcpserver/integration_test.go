@@ -13,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/respawn-app/ksrc/internal/cat"
+	"github.com/respawn-app/ksrc/internal/fileidcache"
 	"github.com/respawn-app/ksrc/internal/testutil"
 )
 
@@ -136,6 +137,64 @@ func TestMCPServerSearchAndCatIntegrationReusesTrackedFileIDAcrossCWD(t *testing
 	catText := strings.TrimSpace(textFromResult(catRes))
 	if catText != "public class LocalDate" {
 		t.Fatalf("unexpected cat output: %q", catText)
+	}
+}
+
+func TestMCPServerCatAndWhereFileIDHonorGradleUserHomeOnlyContext(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	root := filepath.Clean(filepath.Join(wd, "..", ".."))
+	projectDir := filepath.Join(root, "testdata", "fixture")
+	inner := "kotlinx/datetime/LocalDate.kt"
+	fileID := "org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/" + inner
+	staleJarPath := filepath.Join(t.TempDir(), "stale-kotlinx-datetime-sources.jar")
+	freshJarPath := filepath.Join(t.TempDir(), "fresh-kotlinx-datetime-sources.jar")
+	cacheDir := filepath.Join(t.TempDir(), "fileid-cache")
+
+	if err := writeZipFile(staleJarPath, inner, "stale content\n"); err != nil {
+		t.Fatalf("write stale jar: %v", err)
+	}
+	if err := writeZipFile(freshJarPath, inner, "fresh content\n"); err != nil {
+		t.Fatalf("write fresh jar: %v", err)
+	}
+	t.Setenv("KSRC_FILEID_CACHE_DIR", cacheDir)
+	if err := fileidcache.Register(fileID, staleJarPath); err != nil {
+		t.Fatalf("register stale file-id: %v", err)
+	}
+
+	ctx, session, cleanup := startTestSessionAtWithCache(t, root, projectDir, freshJarPath, cacheDir)
+	defer cleanup()
+	gradleHome := filepath.Join(t.TempDir(), "isolated-gradle-home")
+
+	catRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "cat",
+		Arguments: map[string]any{
+			"fileId":         fileID,
+			"gradleUserHome": gradleHome,
+		},
+	})
+	if err != nil {
+		t.Fatalf("cat tool: %v", err)
+	}
+	if got := strings.TrimSpace(textFromResult(catRes)); got != "fresh content" {
+		t.Fatalf("cat used stale file-id mapping, got %q", got)
+	}
+
+	whereRes, err := session.CallTool(ctx, &mcp.CallToolParams{
+		Name: "where",
+		Arguments: map[string]any{
+			"pathOrCoord":    fileID,
+			"gradleUserHome": gradleHome,
+		},
+	})
+	if err != nil {
+		t.Fatalf("where tool: %v", err)
+	}
+	wantWhere := fileID + "|" + freshJarPath + "\n"
+	if got := textFromResult(whereRes); got != wantWhere {
+		t.Fatalf("where used stale file-id mapping\nwant: %q\n got: %q", wantWhere, got)
 	}
 }
 
@@ -373,6 +432,10 @@ func startTestSession(t *testing.T, root string, projectDir string, jarPath stri
 }
 
 func startTestSessionAt(t *testing.T, root string, workDir string, jarPath string) (context.Context, toolSession, func()) {
+	return startTestSessionAtWithCache(t, root, workDir, jarPath, filepath.Join(t.TempDir(), "fileid-cache"))
+}
+
+func startTestSessionAtWithCache(t *testing.T, root string, workDir string, jarPath string, cacheDir string) (context.Context, toolSession, func()) {
 	t.Helper()
 
 	binPath := filepath.Join(t.TempDir(), "ksrc")
@@ -386,7 +449,6 @@ func startTestSessionAt(t *testing.T, root string, workDir string, jarPath strin
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	cmd := exec.CommandContext(ctx, binPath, "mcp", "--tools=all")
 	cmd.Dir = workDir
-	cacheDir := filepath.Join(t.TempDir(), "fileid-cache")
 	cmd.Env = append(os.Environ(),
 		"KSRC_TEST_JAR="+jarPath,
 		"KSRC_FILEID_CACHE_DIR="+cacheDir,

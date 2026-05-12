@@ -20,6 +20,7 @@ type resolveSpecInput struct {
 	Buildsrc      *bool
 	Buildscript   *bool
 	IncludeBuilds *bool
+	GradleHome    string
 }
 
 func buildSearchSpec(input SearchInput) adapter.ResolveSpec {
@@ -32,6 +33,7 @@ func buildSearchSpec(input SearchInput) adapter.ResolveSpec {
 		Config:      input.Config,
 		Targets:     input.Targets,
 		Subprojects: input.Subprojects,
+		GradleHome:  input.GradleHome,
 	})
 	spec.ApplyFilters = true
 	spec.AllowCacheFallback = true
@@ -53,6 +55,7 @@ func buildFileIDSpec(input CatInput, coord resolve.Coord) adapter.ResolveSpec {
 		Buildsrc:      input.Buildsrc,
 		Buildscript:   input.Buildscript,
 		IncludeBuilds: input.IncludeBuilds,
+		GradleHome:    input.GradleHome,
 	})
 	spec.ApplyFilters = true
 	spec.AllowCacheFallback = true
@@ -69,6 +72,7 @@ func buildDepsSpec(input DepsInput) adapter.ResolveSpec {
 		Buildsrc:      input.Buildsrc,
 		Buildscript:   input.Buildscript,
 		IncludeBuilds: input.IncludeBuilds,
+		GradleHome:    input.GradleHome,
 	})
 	spec.ApplyFilters = false
 	spec.AllowCacheFallback = false
@@ -83,6 +87,7 @@ func buildFetchSpec(input FetchInput, coord resolve.Coord) adapter.ResolveSpec {
 		Buildsrc:      input.Buildsrc,
 		Buildscript:   input.Buildscript,
 		IncludeBuilds: input.IncludeBuilds,
+		GradleHome:    input.GradleHome,
 	})
 	spec.Dep = coord.String()
 	spec.ApplyFilters = false
@@ -103,6 +108,7 @@ func buildResolveToolSpec(input ResolveInput) adapter.ResolveSpec {
 		Buildsrc:      input.Buildsrc,
 		Buildscript:   input.Buildscript,
 		IncludeBuilds: input.IncludeBuilds,
+		GradleHome:    input.GradleHome,
 	})
 	spec.ApplyFilters = true
 	spec.AllowCacheFallback = true
@@ -124,6 +130,7 @@ func buildWhereCoordSpec(input WhereInput, coord resolve.Coord, dep string) adap
 		Buildsrc:      input.Buildsrc,
 		Buildscript:   input.Buildscript,
 		IncludeBuilds: input.IncludeBuilds,
+		GradleHome:    input.GradleHome,
 	})
 	spec.Dep = dep
 	spec.ApplyFilters = true
@@ -144,6 +151,7 @@ func buildWhereSpec(input WhereInput, group, artifact, version, dep string) adap
 		Buildsrc:      input.Buildsrc,
 		Buildscript:   input.Buildscript,
 		IncludeBuilds: input.IncludeBuilds,
+		GradleHome:    input.GradleHome,
 	})
 	spec.Dep = dep
 	spec.ApplyFilters = true
@@ -165,5 +173,6 @@ func buildResolveSpec(input resolveSpecInput) adapter.ResolveSpec {
 		IncludeBuildSrc:       boolOrDefault(input.Buildsrc, true),
 		IncludeBuildscript:    boolOrDefault(input.Buildscript, true),
 		IncludeIncludedBuilds: boolOrDefault(input.IncludeBuilds, true),
+		GradleUserHome:        input.GradleHome,
 	}
 }

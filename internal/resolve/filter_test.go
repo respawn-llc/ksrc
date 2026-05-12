@@ -91,3 +91,27 @@ func TestFilterSourcesAndCoordsShareSelectorSemantics(t *testing.T) {
 		t.Fatalf("unexpected source path: %q", filteredSources[0].Path)
 	}
 }
+
+func TestFilterSourcesKeepsExternalVariantsSelectedByMatchingCoord(t *testing.T) {
+	t.Parallel()
+
+	sources := []SourceJar{
+		{Coord: Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"}, Path: "/tmp/datetime.jar"},
+		{
+			Coord: Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime-jvm", Version: "0.7.1"},
+			Path:  "/tmp/datetime-jvm.jar",
+			SelectedBy: []Coord{
+				{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"},
+			},
+		},
+		{Coord: Coord{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-coroutines-core", Version: "1.10.2"}, Path: "/tmp/coroutines.jar"},
+	}
+
+	filtered := FilterSources(sources, "org.jetbrains.kotlinx:kotlinx-datetime", "", "", "")
+	if len(filtered) != 2 {
+		t.Fatalf("expected base and selected external variant sources, got %#v", filtered)
+	}
+	if filtered[0].Path != "/tmp/datetime.jar" || filtered[1].Path != "/tmp/datetime-jvm.jar" {
+		t.Fatalf("unexpected filtered sources: %#v", filtered)
+	}
+}

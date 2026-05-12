@@ -74,6 +74,35 @@ func TestMergeResultsIncludesWarnings(t *testing.T) {
 	}
 }
 
+func TestMergeResultsUnionsSelectedByForDuplicateSources(t *testing.T) {
+	coord := resolve.Coord{Group: "com.example", Artifact: "demo", Version: "1.0.0"}
+	jvm := resolve.Coord{Group: "com.example", Artifact: "demo-jvm", Version: "1.0.0"}
+	js := resolve.Coord{Group: "com.example", Artifact: "demo-js", Version: "1.0.0"}
+	base := ResolveResult{
+		Sources: []resolve.SourceJar{{
+			Coord:      coord,
+			Path:       "/tmp/demo-sources.jar",
+			SelectedBy: []resolve.Coord{jvm},
+		}},
+	}
+	extra := ResolveResult{
+		Sources: []resolve.SourceJar{{
+			Coord:      coord,
+			Path:       "/tmp/demo-sources.jar",
+			SelectedBy: []resolve.Coord{jvm, js},
+		}},
+	}
+
+	merged := mergeResults(base, extra)
+	if len(merged.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(merged.Sources))
+	}
+	want := []resolve.Coord{jvm, js}
+	if !reflect.DeepEqual(merged.Sources[0].SelectedBy, want) {
+		t.Fatalf("unexpected selectedBy: %+v", merged.Sources[0].SelectedBy)
+	}
+}
+
 func TestResolveStopsAfterRootSources(t *testing.T) {
 	root := t.TempDir()
 	runner := &scriptedRunner{
@@ -96,6 +125,109 @@ func TestResolveStopsAfterRootSources(t *testing.T) {
 	}
 	if len(runner.calls) != 1 {
 		t.Fatalf("expected 1 Gradle call, got %d", len(runner.calls))
+	}
+}
+
+func TestResolveNormalizesRelativeGradleUserHomeBeforeInvokingWrapper(t *testing.T) {
+	root := t.TempDir()
+	userHome := "relative-gradle-home"
+	wantUserHome := filepath.Join(root, userHome)
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
+			},
+		},
+	}
+	if err := os.WriteFile(filepath.Join(root, "gradlew"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatalf("write wrapper: %v", err)
+	}
+
+	_, err := Resolve(context.Background(), runner, ResolveOptions{
+		ProjectDir:      root,
+		GradleUserHome:  userHome,
+		IncludeBuildSrc: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected 1 Gradle call, got %d", len(runner.calls))
+	}
+	if !strings.Contains(runner.calls[0], "--gradle-user-home "+wantUserHome) {
+		t.Fatalf("expected --gradle-user-home in args, got %q", runner.calls[0])
+	}
+}
+
+func TestResolveUsesSameRelativeGradleUserHomeForIncludedBuilds(t *testing.T) {
+	root := t.TempDir()
+	included := t.TempDir()
+	wantUserHome := filepath.Join(root, "relative-gradle-home")
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "include", Path: included}),
+			},
+			included: {
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
+			},
+		},
+	}
+
+	_, err := Resolve(context.Background(), runner, ResolveOptions{
+		ProjectDir:            root,
+		GradleUserHome:        "relative-gradle-home",
+		IncludeIncludedBuilds: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 Gradle calls, got %d", len(runner.calls))
+	}
+	for _, call := range runner.calls {
+		if !strings.Contains(call, "--gradle-user-home "+wantUserHome) {
+			t.Fatalf("expected all Gradle calls to share %q, got %q", wantUserHome, call)
+		}
+		if strings.Contains(call, filepath.Join(included, "relative-gradle-home")) {
+			t.Fatalf("included build reinterpreted relative Gradle home: %q", call)
+		}
+	}
+}
+
+func TestResolveUsesSameRelativeEnvGradleUserHomeForIncludedBuilds(t *testing.T) {
+	root := t.TempDir()
+	included := t.TempDir()
+	t.Setenv("GRADLE_USER_HOME", "relative-env-gradle-home")
+	wantUserHome := filepath.Join(root, "relative-env-gradle-home")
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{Type: "include", Path: included}),
+			},
+			included: {
+				stdout: outputRecordLine(t, outputRecord{Type: "source", Group: "com.example", Artifact: "demo", Version: "1.0.0", Path: "/tmp/demo-sources.jar"}),
+			},
+		},
+	}
+
+	_, err := Resolve(context.Background(), runner, ResolveOptions{
+		ProjectDir:            root,
+		IncludeIncludedBuilds: true,
+	})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 2 {
+		t.Fatalf("expected 2 Gradle calls, got %d", len(runner.calls))
+	}
+	for _, call := range runner.calls {
+		if !strings.Contains(call, "--gradle-user-home "+wantUserHome) {
+			t.Fatalf("expected all Gradle calls to share %q, got %q", wantUserHome, call)
+		}
+		if strings.Contains(call, filepath.Join(included, "relative-env-gradle-home")) {
+			t.Fatalf("included build reinterpreted relative Gradle home: %q", call)
+		}
 	}
 }
 
@@ -212,6 +344,180 @@ func TestResolveParsesMachineReadableRecordsWithPipesInPath(t *testing.T) {
 	}
 	if len(res.IncludedBuilds) != 1 || res.IncludedBuilds[0] != included {
 		t.Fatalf("unexpected included builds: %+v", res.IncludedBuilds)
+	}
+}
+
+func TestResolveParsesSourceSelectedByRecords(t *testing.T) {
+	root := t.TempDir()
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {
+				stdout: outputRecordLine(t, outputRecord{
+					Type:     "source",
+					Group:    "org.jetbrains.kotlinx",
+					Artifact: "kotlinx-datetime-jvm",
+					Version:  "0.7.1",
+					Path:     "/tmp/kotlinx-datetime-jvm-sources.jar",
+					SelectedBy: []outputCoord{
+						{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"},
+					},
+				}),
+			},
+		},
+	}
+	res, err := Resolve(context.Background(), runner, ResolveOptions{ProjectDir: root})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(res.Sources) != 1 {
+		t.Fatalf("expected one source, got %+v", res.Sources)
+	}
+	want := []resolve.Coord{{Group: "org.jetbrains.kotlinx", Artifact: "kotlinx-datetime", Version: "0.7.1"}}
+	if !reflect.DeepEqual(res.Sources[0].SelectedBy, want) {
+		t.Fatalf("unexpected selectedBy: %+v", res.Sources[0].SelectedBy)
+	}
+}
+
+func TestResolveDoesNotDisableConfigurationCache(t *testing.T) {
+	root := t.TempDir()
+	runner := &scriptedRunner{
+		responses: map[string]runResult{
+			root: {},
+		},
+	}
+	_, err := Resolve(context.Background(), runner, ResolveOptions{ProjectDir: root})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(runner.calls) != 1 {
+		t.Fatalf("expected 1 Gradle call, got %d", len(runner.calls))
+	}
+	if strings.Contains(runner.calls[0], "--no-configuration-cache") {
+		t.Fatalf("expected Gradle args to allow configuration cache, got %q", runner.calls[0])
+	}
+}
+
+func TestWriteInitScriptUsesStableCachePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+
+	first, firstCleanup, err := writeInitScript()
+	if err != nil {
+		t.Fatalf("write first init script: %v", err)
+	}
+	firstCleanup()
+	second, secondCleanup, err := writeInitScript()
+	if err != nil {
+		t.Fatalf("write second init script: %v", err)
+	}
+	secondCleanup()
+
+	if first != second {
+		t.Fatalf("expected stable init script path, got %q and %q", first, second)
+	}
+	if !strings.Contains(filepath.Base(first), initScriptTemplateVersion) {
+		t.Fatalf("expected init script path to include template version, got %q", first)
+	}
+	got, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatalf("read stable init script: %v", err)
+	}
+	if string(got) != InitScript() {
+		t.Fatal("stable init script content differs from rendered init script")
+	}
+}
+
+func TestWriteInitScriptCachePathInvalidatesOnVersionOrContentChange(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+
+	base, baseCleanup, err := writeInitScriptContent("v-test", "println 'one'\n")
+	if err != nil {
+		t.Fatalf("write base init script: %v", err)
+	}
+	baseCleanup()
+	changedContent, changedContentCleanup, err := writeInitScriptContent("v-test", "println 'two'\n")
+	if err != nil {
+		t.Fatalf("write changed-content init script: %v", err)
+	}
+	changedContentCleanup()
+	changedVersion, changedVersionCleanup, err := writeInitScriptContent("v-test-2", "println 'one'\n")
+	if err != nil {
+		t.Fatalf("write changed-version init script: %v", err)
+	}
+	changedVersionCleanup()
+
+	if base == changedContent {
+		t.Fatalf("expected content change to produce new init script path, got %q", base)
+	}
+	if base == changedVersion {
+		t.Fatalf("expected version change to produce new init script path, got %q", base)
+	}
+}
+
+func TestWriteInitScriptFallsBackToTempDirWhenUserCacheUnavailable(t *testing.T) {
+	home := t.TempDir()
+	blockingFile := filepath.Join(t.TempDir(), "cache-root-file")
+	if err := os.WriteFile(blockingFile, []byte("not a directory"), 0o644); err != nil {
+		t.Fatalf("write blocking cache root: %v", err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", blockingFile)
+
+	path, cleanup, err := writeInitScriptContent("v-test", "println 'fallback'\n")
+	if err != nil {
+		t.Fatalf("write fallback init script: %v", err)
+	}
+	defer cleanup()
+
+	if !strings.HasPrefix(path, os.TempDir()) {
+		t.Fatalf("expected fallback init script under temp dir, got %q", path)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fallback init script: %v", err)
+	}
+	if string(got) != "println 'fallback'\n" {
+		t.Fatalf("unexpected fallback init script content: %q", got)
+	}
+}
+
+func TestWriteInitScriptFallsBackToTempDirWhenUserCacheReadOnly(t *testing.T) {
+	home := t.TempDir()
+	cacheRoot := filepath.Join(home, ".cache")
+	cacheDir := filepath.Join(cacheRoot, "ksrc", "gradle-init")
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		t.Fatalf("mkdir cache dir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chmod(cacheDir, 0o755)
+	})
+	if err := os.Chmod(cacheDir, 0o555); err != nil {
+		t.Fatalf("chmod cache dir: %v", err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CACHE_HOME", cacheRoot)
+
+	path, cleanup, err := writeInitScriptContent("v-test", "println 'fallback read-only'\n")
+	if err != nil {
+		t.Fatalf("write fallback init script: %v", err)
+	}
+	defer cleanup()
+
+	if strings.HasPrefix(path, cacheDir) {
+		t.Fatalf("expected fallback init script outside read-only cache dir, got %q", path)
+	}
+	if !strings.HasPrefix(path, os.TempDir()) {
+		t.Fatalf("expected fallback init script under temp dir, got %q", path)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fallback init script: %v", err)
+	}
+	if string(got) != "println 'fallback read-only'\n" {
+		t.Fatalf("unexpected fallback init script content: %q", got)
 	}
 }
 

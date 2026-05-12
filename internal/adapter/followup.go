@@ -43,6 +43,10 @@ func TryTrackFileLocation(location FileLocation) {
 }
 
 func FindFollowupFileIDLocation(fileID string) (FileLocation, bool, error) {
+	return FindFollowupFileIDLocationWithOptions(fileID, resolve.CacheOptions{})
+}
+
+func FindFollowupFileIDLocationWithOptions(fileID string, opts resolve.CacheOptions) (FileLocation, bool, error) {
 	coord, inner, err := resolve.ParseFileID(fileID)
 	if err != nil {
 		return FileLocation{}, false, err
@@ -60,7 +64,7 @@ func FindFollowupFileIDLocation(fileID string) (FileLocation, bool, error) {
 		// follow-up commands can still resolve from Gradle caches.
 		err = nil
 	}
-	source, found, err := FindCachedCoordSource(coord)
+	source, found, err := FindCachedCoordSourceWithOptions(coord, opts)
 	if err != nil || !found {
 		return FileLocation{}, found, err
 	}
@@ -72,7 +76,11 @@ func FindFollowupFileIDLocation(fileID string) (FileLocation, bool, error) {
 }
 
 func FindCachedCoordSource(coord resolve.Coord) (resolve.SourceJar, bool, error) {
-	sources, err := resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+	return FindCachedCoordSourceWithOptions(coord, resolve.CacheOptions{})
+}
+
+func FindCachedCoordSourceWithOptions(coord resolve.Coord, opts resolve.CacheOptions) (resolve.SourceJar, bool, error) {
+	sources, err := resolve.FindCachedSourcesWithOptions(coord.Group, coord.Artifact, coord.Version, opts)
 	if err != nil {
 		if resolve.IsCachedSourcesNotFound(err) || os.IsNotExist(err) {
 			return resolve.SourceJar{}, false, nil

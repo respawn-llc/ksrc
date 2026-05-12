@@ -32,6 +32,7 @@ type Request struct {
 	IncludeBuildscript    bool
 	IncludeIncludedBuilds bool
 	Dep                   string
+	GradleUserHome        string
 	ApplyFilters          bool
 	AllowCacheFallback    bool
 }
@@ -81,6 +82,7 @@ func (r Request) toOptions() gradle.ResolveOptions {
 		IncludeBuildSrc:       r.IncludeBuildSrc,
 		IncludeBuildscript:    r.IncludeBuildscript,
 		IncludeIncludedBuilds: r.IncludeIncludedBuilds,
+		GradleUserHome:        r.GradleUserHome,
 	}
 }
 

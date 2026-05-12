@@ -1,4 +1,8 @@
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.DefaultTask
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.TaskAction
 import groovy.json.JsonOutput
 
 def splitCsv = { String value ->
@@ -61,6 +65,18 @@ def matchesCoordinateSelectors = { String moduleSelector, String groupSelector, 
 }
 
 
+abstract class KsrcSourcesTask extends DefaultTask {
+    @Input
+    abstract ListProperty<String> getRecords()
+
+    @TaskAction
+    void run() {
+        records.get().each { record ->
+            println record
+        }
+    }
+}
+
 def isSelectedProject = { String pathOrName, String projectPath, String projectName ->
     if (pathOrName.startsWith(':')) return pathOrName == projectPath
     return pathOrName == projectName
@@ -100,141 +116,186 @@ def scopeProp = props['ksrcScope'] ?: 'compile'
 def depProp = props['ksrcDep']
 def includeBuildscript = (props['ksrcBuildscript'] ?: 'true').toString().toBoolean()
 def includeIncludedBuilds = (props['ksrcIncludeBuilds'] ?: 'true').toString().toBoolean()
-def emitRecord = { Map payload ->
-    println "KSRCJSON\t${JsonOutput.toJson(payload)}"
+def toRecord = { Map payload ->
+    "KSRCJSON\t${JsonOutput.toJson(payload)}"
 }
 
-gradle.rootProject { root ->
-
-    def configs = splitCsv(configProp as String)
-    def targets = splitCsv(targetsProp as String)
-    def subprojects = splitCsv(subprojectsProp as String)
-
-    def selectedProjects = subprojects.isEmpty() ? root.allprojects : root.allprojects.findAll { p ->
-        subprojects.any { isSelectedProject(it as String, p.path, p.name) }
-    }
-
-    def emitForProject = { proj ->
-        def selectedConfigs = []
-        if (!depProp) {
-            proj.configurations.each { cfg ->
-                if (!cfg.canBeResolved) return
-                if (!configs.isEmpty()) {
-                    if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) selectedConfigs << cfg
-                } else {
-                    if (matchesTargets(cfg.name, targets) && matchesScope(cfg.name, scopeProp as String)) selectedConfigs << cfg
-                }
-            }
-        } else {
-            def dep = proj.dependencies.create(depProp as String)
-            def detached = proj.configurations.detachedConfiguration(dep)
-            detached.transitive = false
-            selectedConfigs << detached
-        }
-
-        def moduleIds = [] as Set
-        selectedConfigs.each { cfg ->
-            cfg.incoming.resolutionResult.allComponents.each { comp ->
-                def id = comp.id
-                if (id instanceof ModuleComponentIdentifier) moduleIds << id
-            }
-        }
-
-        if (includeBuildscript) {
-            def buildscriptConfigs = []
-            proj.buildscript.configurations.each { cfg ->
-                if (!cfg.canBeResolved) return
-                if (!configs.isEmpty()) {
-                    if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) buildscriptConfigs << cfg
-                } else {
-                    buildscriptConfigs << cfg
-                }
-            }
-            buildscriptConfigs.each { cfg ->
-                cfg.incoming.resolutionResult.allComponents.each { comp ->
-                    def id = comp.id
-                    if (id instanceof ModuleComponentIdentifier) moduleIds << id
-                }
-            }
-        }
-
-        def filteredIds = moduleIds.findAll { id ->
-            matchesCoordinateSelectors(moduleProp as String, groupProp as String, artifactProp as String, versionProp as String, id.group, id.module, id.version)
-        }
-
-        filteredIds.each { id ->
-            emitRecord([type: 'dep', group: id.group, artifact: id.module, version: id.version])
-        }
-
-        if (filteredIds.isEmpty()) return
-
-        def sourceDeps = filteredIds.collect { id ->
-            proj.dependencies.create([group: id.group, name: id.module, version: id.version, classifier: 'sources'])
-        }
-        if (sourceDeps.isEmpty()) return
-
-        def sourcesCfg = proj.configurations.detachedConfiguration()
-        sourceDeps.each { dep ->
-            sourcesCfg.dependencies.add(dep)
-        }
-        sourcesCfg.transitive = false
-        def lenient = sourcesCfg.resolvedConfiguration.lenientConfiguration
-        lenient.artifacts.each { art ->
-            def id = art.moduleVersion.id
-            emitRecord([type: 'source', group: id.group, artifact: id.name, version: id.version, path: art.file.absolutePath])
-        }
-    }
-
-    if (depProp) {
-        def depProjects = subprojects.isEmpty() ? [root] : selectedProjects
-        root.tasks.register('ksrcSources') {
-            doLast {
-                depProjects.each { p ->
-                    emitForProject(p)
-                }
-            }
-        }
-        return
-    }
-
-    def projectTasks = []
-    selectedProjects.each { p ->
-        def projectRef = p
-        projectRef.tasks.register('ksrcSourcesProject') {
-            doLast {
-                emitForProject(projectRef)
-            }
-        }
-        projectTasks << projectRef.tasks.named('ksrcSourcesProject')
-    }
-
-    root.tasks.register('ksrcSources') {
-        dependsOn(projectTasks)
-    }
+def coordKey = { String group, String artifact, String version ->
+    "${group}:${artifact}:${version}"
 }
 
-gradle.settingsEvaluated { settings ->
-    if (!includeIncludedBuilds) return
+def coordPayload = { id ->
+    [group: id.group, artifact: id.module, version: id.version]
+}
+
+def externalVariantOwner = { variant ->
     try {
-        gradle.includedBuilds.each { build ->
-            def dir = null
-            try {
-                dir = build.projectDir
-            } catch (Throwable ignored) {
-                dir = null
-            }
-            if (dir == null) {
-                try {
-                    dir = build.rootDir
-                } catch (Throwable ignored) {
-                    dir = null
-                }
-            }
-            if (dir != null) {
-                emitRecord([type: 'include', path: dir.absolutePath])
-            }
+        def external = variant.externalVariant
+        if (external == null || !external.present) return null
+        def owner = external.get().owner
+        if (owner instanceof ModuleComponentIdentifier) return owner
+    } catch (Throwable ignored) {
+        return null
+    }
+    return null
+}
+
+def collectExternalVariantOwners = { component ->
+    def owners = [] as Set
+    try {
+        component.variants.each { variant ->
+            def owner = externalVariantOwner(variant)
+            if (owner != null) owners << owner
         }
     } catch (Throwable ignored) {
-        // Included builds may be unavailable for this Gradle version or lifecycle phase.
+        // Older Gradle versions may not expose external variants; legacy source resolution still applies.
+    }
+    return owners
+}
+
+def configs = splitCsv(configProp as String)
+def targets = splitCsv(targetsProp as String)
+def subprojects = splitCsv(subprojectsProp as String)
+
+def isProjectSelected = { String projectPath, String projectName ->
+    if (depProp && subprojects.isEmpty()) return projectPath == ':'
+    if (subprojects.isEmpty()) return true
+    return subprojects.any { isSelectedProject(it as String, projectPath, projectName) }
+}
+
+def buildRecordsForProject = { proj ->
+    def selectedConfigs = []
+    if (!depProp) {
+        proj.configurations.each { cfg ->
+            if (!cfg.canBeResolved) return
+            if (!configs.isEmpty()) {
+                if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) selectedConfigs << cfg
+            } else {
+                if (matchesTargets(cfg.name, targets) && matchesScope(cfg.name, scopeProp as String)) selectedConfigs << cfg
+            }
+        }
+    } else {
+        def dep = proj.dependencies.create(depProp as String)
+        def detached = proj.configurations.detachedConfiguration(dep)
+        detached.transitive = false
+        selectedConfigs << detached
+    }
+
+    def moduleIds = [] as Set
+    def externalVariantIds = [] as Set
+    def selectedByByExternalVariant = [:].withDefault { [] as Set }
+    selectedConfigs.each { cfg ->
+        cfg.incoming.resolutionResult.allComponents.each { comp ->
+            def id = comp.id
+            if (id instanceof ModuleComponentIdentifier) {
+                moduleIds << id
+                if (matchesCoordinateSelectors(moduleProp as String, groupProp as String, artifactProp as String, versionProp as String, id.group, id.module, id.version)) {
+                    collectExternalVariantOwners(comp).each { externalId ->
+                        externalVariantIds << externalId
+                        selectedByByExternalVariant[coordKey(externalId.group, externalId.module, externalId.version)] << coordPayload(id)
+                    }
+                }
+            }
+        }
+    }
+
+    if (includeBuildscript) {
+        def buildscriptConfigs = []
+        proj.buildscript.configurations.each { cfg ->
+            if (!cfg.canBeResolved) return
+            if (!configs.isEmpty()) {
+                if (configs.any { cfgPattern -> matchesGlobPattern(cfgPattern as String, cfg.name) }) buildscriptConfigs << cfg
+            } else {
+                buildscriptConfigs << cfg
+            }
+        }
+        buildscriptConfigs.each { cfg ->
+            cfg.incoming.resolutionResult.allComponents.each { comp ->
+                def id = comp.id
+                if (id instanceof ModuleComponentIdentifier) {
+                    moduleIds << id
+                    if (matchesCoordinateSelectors(moduleProp as String, groupProp as String, artifactProp as String, versionProp as String, id.group, id.module, id.version)) {
+                        collectExternalVariantOwners(comp).each { externalId ->
+                            externalVariantIds << externalId
+                            selectedByByExternalVariant[coordKey(externalId.group, externalId.module, externalId.version)] << coordPayload(id)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    def filteredIds = moduleIds.findAll { id ->
+        matchesCoordinateSelectors(moduleProp as String, groupProp as String, artifactProp as String, versionProp as String, id.group, id.module, id.version)
+    } as Set
+    filteredIds.addAll(externalVariantIds)
+
+    def records = []
+    filteredIds.each { id ->
+        records << toRecord([type: 'dep', group: id.group, artifact: id.module, version: id.version])
+    }
+
+    if (filteredIds.isEmpty()) return records
+
+    def sourceDeps = filteredIds.collect { id ->
+        proj.dependencies.create([group: id.group, name: id.module, version: id.version, classifier: 'sources'])
+    }
+    if (sourceDeps.isEmpty()) return records
+
+    def sourcesCfg = proj.configurations.detachedConfiguration()
+    sourceDeps.each { dep ->
+        sourcesCfg.dependencies.add(dep)
+    }
+    sourcesCfg.transitive = false
+    def lenient = sourcesCfg.resolvedConfiguration.lenientConfiguration
+    lenient.artifacts.each { art ->
+        def id = art.moduleVersion.id
+        def payload = [type: 'source', group: id.group, artifact: id.name, version: id.version, path: art.file.absolutePath]
+        def selectedBy = selectedByByExternalVariant[coordKey(id.group, id.name, id.version)]
+        if (!selectedBy.isEmpty()) {
+            payload.selectedBy = selectedBy as List
+        }
+        records << toRecord(payload)
+    }
+    return records
+}
+
+gradle.beforeProject { proj ->
+    def selectedProject = isProjectSelected(proj.path, proj.name)
+    def emitsIncludedBuildRecords = proj.path == ':' && includeIncludedBuilds
+    proj.tasks.register('__ksrcSources', KsrcSourcesTask) {
+        enabled = selectedProject || emitsIncludedBuildRecords
+        if (!selectedProject && !emitsIncludedBuildRecords) {
+            records.set([])
+            return
+        }
+        records.set(proj.providers.provider {
+            def projectRecords = selectedProject ? buildRecordsForProject(proj) : []
+            if (emitsIncludedBuildRecords) {
+                try {
+                    gradle.includedBuilds.each { build ->
+                        def dir = null
+                        try {
+                            dir = build.projectDir
+                        } catch (Throwable ignored) {
+                            dir = null
+                        }
+                        if (dir == null) {
+                            try {
+                                dir = build.rootDir
+                            } catch (Throwable ignored) {
+                                dir = null
+                            }
+                        }
+                        if (dir != null) {
+                            projectRecords << toRecord([type: 'include', path: dir.absolutePath])
+                        }
+                    }
+                } catch (Throwable ignored) {
+                    // Included builds may be unavailable for this Gradle version or lifecycle phase.
+                }
+            }
+            return projectRecords
+        })
     }
 }

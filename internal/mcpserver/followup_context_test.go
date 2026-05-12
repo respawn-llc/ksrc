@@ -13,8 +13,12 @@ func TestCatInputHasExplicitResolutionContext(t *testing.T) {
 		Targets:     []string{" jvm "},
 		Subprojects: []string{" app "},
 		Buildscript: &buildscript,
+		GradleHome:  " .gradle-custom ",
 	}) {
 		t.Fatal("expected explicit cat context to bypass tracked follow-up lookup")
+	}
+	if !catInputHasExplicitResolutionContext(CatInput{GradleHome: " .gradle-custom "}) {
+		t.Fatal("expected explicit cat Gradle user home to bypass tracked follow-up lookup")
 	}
 }
 
@@ -30,7 +34,11 @@ func TestWhereInputHasExplicitFileIDContext(t *testing.T) {
 		Targets:     []string{" iosArm64 "},
 		Subprojects: []string{" shared "},
 		Buildsrc:    &buildsrc,
+		GradleHome:  " .gradle-custom ",
 	}) {
 		t.Fatal("expected explicit where context to bypass tracked follow-up lookup")
+	}
+	if !whereInputHasExplicitFileIDContext(WhereInput{GradleHome: " .gradle-custom "}) {
+		t.Fatal("expected explicit where Gradle user home to bypass tracked follow-up lookup")
 	}
 }

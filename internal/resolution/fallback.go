@@ -37,7 +37,7 @@ func applyCacheFallbackPolicy(plan resolutionPlan, execution gradleExecution) ca
 		return cacheFallbackResult{Mode: cacheFallbackNone}
 	}
 
-	sources, err := resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+	sources, err := resolve.FindCachedSourcesWithOptions(coord.Group, coord.Artifact, coord.Version, cacheOptions(plan))
 	if err != nil {
 		return cacheFallbackResult{Mode: cacheFallbackSelectorOnly}
 	}
@@ -86,15 +86,15 @@ func cacheFallbackSources(req Request, dep string, applyFilters bool) ([]resolve
 		if parseErr != nil {
 			return nil, nil, parseErr
 		}
-		sources, err = resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+		sources, err = resolve.FindCachedSourcesWithOptions(coord.Group, coord.Artifact, coord.Version, cacheOptionsForRequest(req))
 	case req.All || !hasExactSelector(req):
-		sources, err = resolve.FindAllCachedSources()
+		sources, err = resolve.FindAllCachedSourcesWithOptions(cacheOptionsForRequest(req))
 	default:
 		coord, ok := resolve.SelectorToCoord(req.Module, req.Group, req.Artifact, req.Version)
 		if !ok {
 			return nil, nil, fmt.Errorf("cache fallback requires a concrete selector")
 		}
-		sources, err = resolve.FindCachedSources(coord.Group, coord.Artifact, coord.Version)
+		sources, err = resolve.FindCachedSourcesWithOptions(coord.Group, coord.Artifact, coord.Version, cacheOptionsForRequest(req))
 	}
 	if err != nil {
 		return nil, nil, err
@@ -104,6 +104,20 @@ func cacheFallbackSources(req Request, dep string, applyFilters bool) ([]resolve
 		sources = resolve.FilterSources(sources, req.Module, req.Group, req.Artifact, req.Version)
 	}
 	return sources, collectCoords(sources), nil
+}
+
+func cacheOptions(plan resolutionPlan) resolve.CacheOptions {
+	return resolve.CacheOptions{
+		GradleUserHome: plan.Request.GradleUserHome,
+		WorkDir:        plan.Options.ProjectDir,
+	}
+}
+
+func cacheOptionsForRequest(req Request) resolve.CacheOptions {
+	return resolve.CacheOptions{
+		GradleUserHome: req.GradleUserHome,
+		WorkDir:        req.Project,
+	}
 }
 
 func hasExactSelector(req Request) bool {

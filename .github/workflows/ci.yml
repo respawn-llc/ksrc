@@ -43,7 +43,9 @@ jobs:
           go vet ./...
 
       - name: Build
-        run: go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${KSRC_VERSION}" ./...
+        run: |
+          go build ./...
+          ./scripts/build.sh
 
       - name: Test
         run: go test ./...
@@ -88,7 +90,7 @@ jobs:
           sudo apt-get install -y ripgrep
 
       - name: Build ksrc binary
-        run: go build -ldflags "-X github.com/respawn-app/ksrc/internal/cli.Version=${KSRC_VERSION}" -o ./bin/ksrc ./cmd/ksrc
+        run: ./scripts/build.sh
 
       - name: Smoke test against sample project
         run: ./bin/ksrc search LocalDate --module org.jetbrains.kotlinx:kotlinx-datetime --project ./sample

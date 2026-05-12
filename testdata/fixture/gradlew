@@ -1,7 +1,7 @@
 #!/bin/sh
 # Fake gradle wrapper for tests.
 for arg in "$@"; do
-  if [ "$arg" = "ksrcSources" ]; then
+  if [ "$arg" = "__ksrcSources" ]; then
     printf '%s\n' 'KSRCJSON	{"type":"dep","group":"org.jetbrains.kotlinx","artifact":"kotlinx-datetime","version":"0.7.1"}'
     if [ -n "$KSRC_TEST_JAR" ]; then
       printf 'KSRCJSON	{"type":"source","group":"org.jetbrains.kotlinx","artifact":"kotlinx-datetime","version":"0.7.1","path":"%s"}\n' "$KSRC_TEST_JAR"

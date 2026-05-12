@@ -91,6 +91,7 @@ type SearchInput struct {
 	RgArgs      []string `json:"rgArgs,omitempty" jsonschema:"extra rg args (optional, default: none)"`
 	Scope       string   `json:"scope,omitempty" jsonschema:"dependency scope (optional, default: compile)"`
 	Targets     []string `json:"targets,omitempty" jsonschema:"KMP target filters (optional, default: all targets)"`
+	GradleHome  string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
 }
 
 type CatInput struct {
@@ -104,6 +105,7 @@ type CatInput struct {
 	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc in fallback resolution (optional, default: true)"`
 	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript in fallback resolution (optional, default: true)"`
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds in fallback resolution (optional, default: true)"`
+	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home for fallback resolution (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
 }
 
 type DepsInput struct {
@@ -118,6 +120,7 @@ type DepsInput struct {
 	Group         string   `json:"group,omitempty" jsonschema:"group filter (optional, default: all dependencies)"`
 	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter (optional, default: all artifacts)"`
 	Version       string   `json:"version,omitempty" jsonschema:"version filter (optional, default: all versions)"`
+	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
 }
 
 type FetchInput struct {
@@ -128,6 +131,7 @@ type FetchInput struct {
 	Buildsrc      *bool  `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
 	Buildscript   *bool  `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
 	IncludeBuilds *bool  `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
+	GradleHome    string `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
 }
 
 type ResolveInput struct {
@@ -142,6 +146,7 @@ type ResolveInput struct {
 	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
 	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
+	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
 }
 
 type WhereInput struct {
@@ -157,4 +162,5 @@ type WhereInput struct {
 	Buildsrc      *bool    `json:"buildsrc,omitempty" jsonschema:"include buildSrc (optional, default: true)"`
 	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
+	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
 }

@@ -99,6 +99,9 @@ If you want faster execution & less noise, specify:
 - `--artifact` to limit search to one artifact, (or `--module` to also limit by version)
 - `--subproject` to help discovery for monorepos/large modular apps
 - `--targets` to limit to specific KMP targets. 
+- `--gradle-user-home` if you need to override `GRADLE_USER_HOME`; otherwise `ksrc` respects `GRADLE_USER_HOME` and defaults to `~/.gradle`.
+
+For KMP modules, `--module group:artifact` searches common/base sources plus Gradle-selected platform variant source jars by default. Use `--targets` or `--config` to narrow variants.
 
 2. When you have found the desired artifact, read the file contents:
 
@@ -110,10 +113,20 @@ $ ksrc cat 'pro.respawn.flowmvi:core:3.3.0-alpha03!/commonMain/pro/respawn/flowm
 
 ```bash
 $ ksrc where kotlinx/datetime/LocalDate.kt --group org.jetbrains.kotlinx --artifact kotlinx-datetime
-org.jetbrains.kotlinx:kotlinx-datetime:0.7.1!/kotlinx/datetime/LocalDate.kt|/path/to/kotlinx-datetime-0.7.1-sources.jar
+org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt|/path/to/kotlinx-datetime-0.8.0-sources.jar
 ```
 
 For path lookups, text before `|` uses same `<file-id>` contract as `search`, so you can pass it directly to `ksrc cat` or `ksrc open`.
+
+## Maintenance
+
+To bump dependency version sources in this repository:
+
+```bash
+./scripts/update-dependencies.sh
+```
+
+The script updates Go modules/toolchain, Gradle wrappers, the sample Gradle version catalog, Gradle fixture dependency pins, and pinned GitHub Actions. Add `--verify` to run format/vet/test/build plus a sample smoke check. Set `GITHUB_TOKEN` when GitHub API rate limits are a concern.
 
 ## License
 
