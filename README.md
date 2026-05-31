@@ -20,7 +20,7 @@ Start by installing the **command itself**.
 ### Homebrew (macOS/Linux) - recommended, auto-updated:
 
 ```
-brew tap respawn-app/tap
+brew tap respawn-llc/tap
 brew install ksrc
 ```
 

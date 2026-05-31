@@ -60,5 +60,5 @@ Notes:
 - Verify the draft release assets are present and correct.
 - Verify the tap PR is opened and `pr-pull` ran successfully.
 - On macOS 26 Tahoe (arm64), run:
-  - `brew tap respawn-app/tap`
+  - `brew tap respawn-llc/tap`
   - `brew install ksrc`
