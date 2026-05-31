@@ -153,7 +153,7 @@ jobs:
 
       - uses: actions/checkout@v6.0.2
         with:
-          repository: respawn-app/homebrew-tap
+          repository: respawn-llc/homebrew-tap
           path: homebrew-tap
           token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
 

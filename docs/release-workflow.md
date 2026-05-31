@@ -8,7 +8,7 @@ This document describes how a release is cut, what must be bumped, and what auto
 - Claude plugin version: `.claude-plugin/plugin.json`
 - Release workflow: `.github/workflows/release.yml`
 - Tap update script: `scripts/update-brew-tap.sh`
-- Homebrew tap repo (separate): `../homebrew-tap` or https://github.com/respawn-app/homebrew-tap.
+- Homebrew tap repo (separate): `../homebrew-tap` or https://github.com/respawn-llc/homebrew-tap.
   - Formula: `../homebrew-tap/Formula/ksrc.rb`
   - Tap CI:
     - `../homebrew-tap/.github/workflows/tests.yml` (brew test-bot)

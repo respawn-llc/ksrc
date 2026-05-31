@@ -31,7 +31,7 @@ ksrc installed manually does NOT auto-update, unlike ksrc skills and plugins. Pl
 Install script (macOS/Linux):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/respawn-app/ksrc/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/respawn-llc/ksrc/main/scripts/install.sh | sh
 ```
 
 ## 2. Teach agents how to use it
@@ -52,7 +52,7 @@ Add the Respawn marketplace, then install the plugin:
 Install from the public GitHub path:
 
 ```
-$skill-installer install https://github.com/respawn-app/ksrc/tree/main/skills/ksrc
+$skill-installer install https://github.com/respawn-llc/ksrc/tree/main/skills/ksrc
 ```
 
 ### MCP (Model Context Protocol)
