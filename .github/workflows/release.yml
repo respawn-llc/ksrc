@@ -172,7 +172,7 @@ jobs:
         with:
           github-token: ${{ secrets.RESPAWN_BREW_TAP_TOKEN }}
           script: |
-            const owner = "respawn-app";
+            const owner = "respawn-llc";
             const repo = "homebrew-tap";
             const name = "pr-pull";
             try {

@@ -9,7 +9,7 @@ Updates the Homebrew tap formula for ksrc with a new tag tarball + sha256.
 
 Defaults:
   --version : $KSRC_VERSION, $GITHUB_REF_NAME, or latest git tag in this repo
-  --repo    : respawn-app/ksrc
+  --repo    : respawn-llc/ksrc
   --formula : ksrc
   --tap     : $KSRC_TAP_PATH, $HOMEBREW_TAP_PATH, else ../homebrew-tap (relative to repo root)
 
@@ -20,7 +20,7 @@ USAGE
 }
 
 version=""
-repo="respawn-app/ksrc"
+repo="respawn-llc/ksrc"
 formula="ksrc"
 tap_dir=""
 do_commit="false"

@@ -43,7 +43,7 @@ Next up, install the claude code plugin/skill, to let your agents know they _can
 Add the Respawn marketplace, then install the plugin:
 
 ```
-/plugin marketplace add respawn-app/claude-plugin-marketplace
+/plugin marketplace add respawn-llc/claude-plugin-marketplace
 /plugin install ksrc@respawn-tools
 ```
 

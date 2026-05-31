@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-REPO="${KSRC_REPO:-respawn-app/ksrc}"
+REPO="${KSRC_REPO:-respawn-llc/ksrc}"
 VERSION="${KSRC_VERSION:-${VERSION:-}}"
 PREFIX="${KSRC_PREFIX:-}"
 RELEASE_BASE="${KSRC_RELEASE_BASE:-https://github.com/${REPO}/releases/download}"
@@ -17,7 +17,7 @@ Options:
 Environment:
   KSRC_VERSION       Override version
   KSRC_PREFIX        Override prefix
-  KSRC_REPO          Override repo (default: respawn-app/ksrc)
+  KSRC_REPO          Override repo (default: respawn-llc/ksrc)
   KSRC_RELEASE_BASE  Override release base URL
   GITHUB_TOKEN       GitHub token for API rate limits
   GH_TOKEN           GitHub token for API rate limits
