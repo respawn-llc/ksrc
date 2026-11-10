@@ -141,6 +141,22 @@ func resolveSDKPath(base, value string) (string, bool) {
 	return value, true
 }
 
+// PlatformPackageRevision reads Pkg.Revision from source.properties next to a
+// platform jar. Android replaces that jar in place and bumps the revision,
+// so the same path can hold different bytes.
+func PlatformPackageRevision(jarPath string) (string, bool) {
+	dir := filepath.Dir(jarPath)
+	if filepath.Base(filepath.Dir(dir)) != "platforms" || !strings.HasPrefix(filepath.Base(dir), "android-") {
+		return "", false
+	}
+	value, ok := readPropertiesValue(filepath.Join(dir, "source.properties"), "Pkg.Revision")
+	value = strings.TrimSpace(value)
+	if !ok || value == "" {
+		return "", false
+	}
+	return value, true
+}
+
 func readPropertiesValue(path, key string) (string, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
