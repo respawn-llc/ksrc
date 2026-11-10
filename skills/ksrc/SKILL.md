@@ -19,7 +19,7 @@ ksrc search "class Activity " --module sdk.android:platform:android-36
 ksrc cat sdk.android:platform:android-36!/android/app/Activity.java --lines 767,790
 ```
 
-`--android-home <path>` sets the SDK directory. If omitted, ksrc checks `local.properties` (`sdk.dir`, then `android.dir`), then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. No `--project` or `--subproject` is required. Full sources win over `android-stubs-src.jar` for the same path. A stub-only hit warns to run `android sdk install sources/android-36`; ksrc does not install it.
+`--android-home <path>` sets the SDK directory. If omitted, ksrc checks `local.properties` in the project directory (`sdk.dir`, then `android.dir`), then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. No `--project` or `--subproject` is required. When `sources/android-36` is installed it is the only root. Otherwise search uses `android-stubs-src.jar` and warns to run `android sdk install sources/android-36`. ksrc does not install it.
 
 2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 

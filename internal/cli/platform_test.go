@@ -42,6 +42,18 @@ func TestSearchAndroidPlatformWithoutGradle(t *testing.T) {
 	if strings.Contains(out, "Stub!") || strings.Contains(out, "WARN:") {
 		t.Fatalf("stub or warning leaked:\n%s", out)
 	}
+	stubOnly, err := runCommand(app, []string{
+		"search", "Stub!",
+		"--module", "sdk.android:platform:android-36",
+		"--android-home", sdk,
+		"--project", t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("stub-only search error: %v\n%s", err, stubOnly)
+	}
+	if strings.Contains(stubOnly, "Stub!") || strings.Contains(stubOnly, "Activity.java") {
+		t.Fatalf("stub-only text was a hit:\n%s", stubOnly)
+	}
 
 	catOut, err := runCommand(app, []string{
 		"cat", "sdk.android:platform:android-36!/android/app/Activity.java",
@@ -85,7 +97,7 @@ func TestSearchAndroidPlatformStubSourcesWarn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("deps error: %v\n%s", err, deps)
 	}
-	if !strings.Contains(deps, "[sources: stubs]") {
+	if !strings.Contains(deps, "android-stubs-src.jar") || !strings.Contains(deps, "android sdk install sources/android-36") {
 		t.Fatalf("deps = %s", deps)
 	}
 }

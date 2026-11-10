@@ -14,15 +14,7 @@ func (s *toolState) handleDeps(ctx context.Context, call *mcp.CallToolRequest) (
 	if err != nil {
 		return nil, err
 	}
-	spec := buildDepsSpec(input)
-	if _, ok, err := resolve.ExactPlatformCoord("", input.Group, input.Artifact, input.Version); err != nil {
-		return toolError(err), nil
-	} else if ok {
-		spec.Group = input.Group
-		spec.Artifact = input.Artifact
-		spec.Version = input.Version
-	}
-	result, err := s.resolver().ResolveSources(ctx, spec)
+	result, err := s.resolver().ResolveSources(ctx, buildDepsSpec(input))
 	if err != nil {
 		return toolError(err), nil
 	}

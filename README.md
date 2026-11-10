@@ -110,7 +110,7 @@ ksrc search "class Activity " --module sdk.android:platform:android-36
 ksrc cat sdk.android:platform:android-36!/android/app/Activity.java --lines 767,790
 ```
 
-`--android-home <path>` overrides the SDK directory. When it is omitted, ksrc uses `local.properties` (`sdk.dir`, then `android.dir`), then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. A numeric version such as `36` is normalized to `android-36`. If only stub sources are installed, search still finds the class and warns to run `android sdk install sources/android-36`.
+`--android-home <path>` overrides the SDK directory. When it is omitted, ksrc uses `local.properties` in the project directory (`sdk.dir`, then `android.dir`), then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. A numeric version such as `36` is normalized to `android-36`. If `sources/android-36` is installed, that directory is the only root. If only the platform stub jar is installed, search still finds the class and warns to run `android sdk install sources/android-36`.
 
 2. When you have found the desired artifact, read the file contents:
 

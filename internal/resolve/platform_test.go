@@ -69,7 +69,7 @@ func TestLoadPlatformPrefersFullSourcesAndFallsBackToStubs(t *testing.T) {
 	if len(both.Warnings) != 0 {
 		t.Fatalf("warnings = %#v", both.Warnings)
 	}
-	if len(both.Sources) != 2 || both.Sources[0].Stub || !both.Sources[1].Stub {
+	if len(both.Sources) != 1 || both.Sources[0].Path != filepath.Join(sdk, "sources", "android-36") {
 		t.Fatalf("sources = %#v", both.Sources)
 	}
 
@@ -80,7 +80,7 @@ func TestLoadPlatformPrefersFullSourcesAndFallsBackToStubs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPlatform stubs: %v", err)
 	}
-	if len(stubs.Sources) != 1 || !stubs.Sources[0].Stub {
+	if len(stubs.Sources) != 1 || stubs.Sources[0].Path != filepath.Join(sdk, "platforms", "android-36", "android-stubs-src.jar") {
 		t.Fatalf("stub sources = %#v", stubs.Sources)
 	}
 	if len(stubs.Warnings) != 1 || !strings.Contains(stubs.Warnings[0], "android sdk install sources/android-36") || !strings.Contains(stubs.Warnings[0], "stub sources") {
@@ -120,6 +120,32 @@ func TestFindAndroidSDKExplicitAndEnv(t *testing.T) {
 	got, err = FindAndroidSDK("", t.TempDir())
 	if err != nil || got != sdk {
 		t.Fatalf("ANDROID_HOME = %q err=%v", got, err)
+	}
+
+	t.Setenv("ANDROID_HOME", "")
+	bare := t.TempDir()
+	got, err = FindAndroidSDK("", bare)
+	if err != nil || got != other {
+		t.Fatalf("ANDROID_SDK_ROOT = %q err=%v", got, err)
+	}
+}
+
+func TestFindAndroidSDKIgnoresParentLocalProperties(t *testing.T) {
+	parentSDK := t.TempDir()
+	projectSDK := t.TempDir()
+	parent := t.TempDir()
+	project := filepath.Join(parent, "app")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "local.properties"), []byte("sdk.dir="+parentSDK+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ANDROID_HOME", projectSDK)
+	t.Setenv("ANDROID_SDK_ROOT", "")
+	got, err := FindAndroidSDK("", project)
+	if err != nil || got != projectSDK {
+		t.Fatalf("parent local.properties leaked: got %q err=%v", got, err)
 	}
 }
 

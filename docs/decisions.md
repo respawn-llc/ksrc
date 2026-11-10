@@ -116,8 +116,8 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 
 ## 2026-11-10: Android platform sources use an SDK coordinate
 - `sdk.android:platform:<platformId>` is a source coordinate stored in the Android SDK, not the Gradle cache. Callers pass the platform id the same way they pass a Maven version, for example `sdk.android:platform:android-36` or `sdk.android:platform:36`.
-- A Gradle project and subproject are not required. `--android-home` / MCP `androidHome` selects the SDK. When omitted, ksrc uses `sdk.dir` then `android.dir` from the nearest `local.properties`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`.
-- Full sources in `<sdk>/sources/<platformId>/` and `platforms/<platformId>/android-stubs-src.jar` are both attached. Search drops a stub hit when that inner path exists in the full tree. `cat` reads the full file when it exists.
+- A Gradle project and subproject are not required. `--android-home` / MCP `androidHome` selects the SDK. When omitted, ksrc uses `sdk.dir` then `android.dir` from `local.properties` in the project directory only, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`.
+- One coordinate has one root. `<sdk>/sources/<platformId>/` is that root when the directory exists. `platforms/<platformId>/android-stubs-src.jar` is used only when the directory is absent.
 - ksrc does not install SDK packages. Stub-only and missing trees warn with `android sdk install sources/<platformId>`.
 - Rationale: an agent already knows the compile SDK it is reading and asks for that coordinate directly. Discovery through the Gradle classpath would require a project and module that this dependency does not live in.
 

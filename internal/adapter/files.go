@@ -40,19 +40,6 @@ func ResolveFileIDLocation(sources []resolve.SourceJar, fileID string, missingHi
 	if err != nil {
 		return FileLocation{}, err
 	}
-	matching := make([]resolve.SourceJar, 0, len(sources))
-	for _, source := range sources {
-		if sameCoord(source.Coord, coord) {
-			matching = append(matching, source)
-		}
-	}
-	if found, foundInner, ok := resolve.FindFileInSources(matching, inner); ok {
-		return FileLocation{
-			Source:    found,
-			InnerPath: foundInner,
-			FileID:    resolve.FormatFileID(found.Coord, foundInner),
-		}, nil
-	}
 	source, err := ResolveCoordSource(sources, coord, missingHint)
 	if err != nil {
 		return FileLocation{}, err

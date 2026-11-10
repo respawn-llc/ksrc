@@ -78,8 +78,8 @@ func PlatformInstallCommand(platformID string) string {
 }
 
 // FindAndroidSDK locates an Android SDK directory.
-// An explicit path wins. Otherwise ksrc reads sdk.dir, then android.dir, from the nearest
-// local.properties at or above projectDir, then ANDROID_HOME, then ANDROID_SDK_ROOT.
+// An explicit path wins. Otherwise ksrc reads sdk.dir, then android.dir, from
+// local.properties in projectDir only, then ANDROID_HOME, then ANDROID_SDK_ROOT.
 func FindAndroidSDK(explicit, projectDir string) (string, error) {
 	explicit = strings.TrimSpace(explicit)
 	if explicit != "" {
@@ -105,32 +105,26 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func sdkFromLocalProperties(start string) (string, bool) {
-	if strings.TrimSpace(start) == "" {
-		start = "."
+func sdkFromLocalProperties(projectDir string) (string, bool) {
+	if strings.TrimSpace(projectDir) == "" {
+		projectDir = "."
 	}
-	dir, err := filepath.Abs(start)
+	dir, err := filepath.Abs(projectDir)
 	if err != nil {
 		return "", false
 	}
-	for {
-		props := filepath.Join(dir, "local.properties")
-		if value, ok := readPropertiesValue(props, "sdk.dir"); ok {
-			if resolved, ok := resolveSDKPath(dir, value); ok {
-				return resolved, true
-			}
+	props := filepath.Join(dir, "local.properties")
+	if value, ok := readPropertiesValue(props, "sdk.dir"); ok {
+		if resolved, ok := resolveSDKPath(dir, value); ok {
+			return resolved, true
 		}
-		if value, ok := readPropertiesValue(props, "android.dir"); ok {
-			if resolved, ok := resolveSDKPath(dir, value); ok {
-				return resolved, true
-			}
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
 	}
+	if value, ok := readPropertiesValue(props, "android.dir"); ok {
+		if resolved, ok := resolveSDKPath(dir, value); ok {
+			return resolved, true
+		}
+	}
+	return "", false
 }
 
 func resolveSDKPath(base, value string) (string, bool) {
@@ -178,8 +172,8 @@ type PlatformLoad struct {
 	Warnings []string
 }
 
-// LoadPlatform attaches full sources and the platform stub jar when they exist.
-// Full sources are listed first so file lookup prefers them.
+// LoadPlatform chooses one readable root for the platform.
+// The sources directory wins. The platform stub jar is used only when that directory is absent.
 func LoadPlatform(sdkRoot, platformID string) (PlatformLoad, error) {
 	id, err := NormalizePlatformID(platformID)
 	if err != nil {
@@ -188,19 +182,16 @@ func LoadPlatform(sdkRoot, platformID string) (PlatformLoad, error) {
 	coord := Coord{Group: PlatformGroup, Artifact: PlatformArtifact, Version: id}
 	sourcesDir := filepath.Join(sdkRoot, "sources", id)
 	stubJar := filepath.Join(sdkRoot, "platforms", id, "android-stubs-src.jar")
-	var sources []SourceJar
+	load := PlatformLoad{Coord: coord}
 	if isDir(sourcesDir) {
-		sources = append(sources, SourceJar{Coord: coord, Path: sourcesDir})
+		load.Sources = []SourceJar{{Coord: coord, Path: sourcesDir}}
+		return load, nil
 	}
 	if info, err := os.Stat(stubJar); err == nil && info.Mode().IsRegular() {
-		sources = append(sources, SourceJar{Coord: coord, Path: stubJar, Stub: true})
+		load.Sources = []SourceJar{{Coord: coord, Path: stubJar}}
+		load.Warnings = []string{fmt.Sprintf("Android platform %s is using stub sources at %s. Install full sources to read implementations: %s", id, stubJar, PlatformInstallCommand(id))}
+		return load, nil
 	}
-	load := PlatformLoad{Coord: coord, Sources: sources}
-	switch {
-	case len(sources) == 0:
-		load.Warnings = append(load.Warnings, fmt.Sprintf("Android platform sources for %s are not installed. Install them with: %s", id, PlatformInstallCommand(id)))
-	case len(sources) == 1 && sources[0].Stub:
-		load.Warnings = append(load.Warnings, fmt.Sprintf("Android platform %s is using stub sources at %s. Install full sources to read implementations: %s", id, stubJar, PlatformInstallCommand(id)))
-	}
+	load.Warnings = []string{fmt.Sprintf("Android platform sources for %s are not installed. Install them with: %s", id, PlatformInstallCommand(id))}
 	return load, nil
 }

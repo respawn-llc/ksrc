@@ -1,38 +1,73 @@
 package search
 
 import (
+	"archive/zip"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/respawn-app/ksrc/internal/executil"
 	"github.com/respawn-app/ksrc/internal/resolve"
 )
 
-func TestSuppressPlatformStubMatchesDropsPathPresentInFullSources(t *testing.T) {
-	root := t.TempDir()
-	full := filepath.Join(root, "android", "app", "Activity.java")
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+func TestSearchPlatformRootOmitsStubOnlyText(t *testing.T) {
+	sdk := t.TempDir()
+	sourcePath := filepath.Join(sdk, "sources", "android-36", "android", "app", "Activity.java")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(full, []byte("class Activity {}\n"), 0o644); err != nil {
+	if err := os.WriteFile(sourcePath, []byte("public class Activity extends ContextThemeWrapper {\n}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	coord := resolve.Coord{Group: resolve.PlatformGroup, Artifact: resolve.PlatformArtifact, Version: "android-36"}
-	stubPath := filepath.Join(root, "android-stubs-src.jar")
-	matches := []Match{
-		{JarPath: filepath.Join(root, "sources"), Coord: coord, InnerPath: "android/app/Activity.java", Text: "class Activity {}"},
-		{JarPath: stubPath, Coord: coord, InnerPath: "android/app/Activity.java", Text: "Stub!"},
-		{JarPath: stubPath, Coord: coord, InnerPath: "android/app/OnlyStub.java", Text: "only stub"},
+	jarPath := filepath.Join(sdk, "platforms", "android-36", "android-stubs-src.jar")
+	if err := os.MkdirAll(filepath.Dir(jarPath), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	jars := []resolve.SourceJar{
-		{Coord: coord, Path: root},
-		{Coord: coord, Path: stubPath, Stub: true},
+	file, err := os.Create(jarPath)
+	if err != nil {
+		t.Fatal(err)
 	}
-	got := suppressPlatformStubMatches(matches, jars)
-	if len(got) != 2 {
-		t.Fatalf("kept %#v", got)
+	zw := zip.NewWriter(file)
+	entry, err := zw.Create("android/app/Activity.java")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got[0].Text != "class Activity {}" || got[1].InnerPath != "android/app/OnlyStub.java" {
-		t.Fatalf("kept %#v", got)
+	if _, err := entry.Write([]byte("public class Activity { throw new RuntimeException(\"StubOnlyToken\"); }\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	loaded, err := resolve.LoadPlatform(sdk, "android-36")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Sources) != 1 {
+		t.Fatalf("roots = %#v", loaded.Sources)
+	}
+	stubHits, err := Run(context.Background(), executil.OSRunner{}, Options{
+		Pattern: "StubOnlyToken",
+		Jars:    loaded.Sources,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stubHits) != 0 {
+		t.Fatalf("stub-only text matched: %#v", stubHits)
+	}
+	fullHits, err := Run(context.Background(), executil.OSRunner{}, Options{
+		Pattern: "ContextThemeWrapper",
+		Jars:    loaded.Sources,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fullHits) != 1 || fullHits[0].FileID != "sdk.android:platform:android-36!/android/app/Activity.java" {
+		t.Fatalf("full hits = %#v", fullHits)
 	}
 }

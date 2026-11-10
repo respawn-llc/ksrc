@@ -68,6 +68,9 @@ func buildFileIDSpec(input CatInput, coord resolve.Coord) adapter.ResolveSpec {
 func buildDepsSpec(input DepsInput) adapter.ResolveSpec {
 	spec := buildResolveSpec(resolveSpecInput{
 		Project:       input.Project,
+		Group:         input.Group,
+		Artifact:      input.Artifact,
+		Version:       input.Version,
 		Scope:         input.Scope,
 		Config:        input.Config,
 		Targets:       input.Targets,
