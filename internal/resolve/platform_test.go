@@ -130,6 +130,44 @@ func TestFindAndroidSDKExplicitAndEnv(t *testing.T) {
 	}
 }
 
+func TestReadPropertiesValueTrimsAndUnescapes(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "local.properties")
+	body := "# comment\r\n\n" +
+		"sdk.dir = /opt/android\n" +
+		"win.dir=C\\:\\\\Users\\\\me\\\\sdk\n" +
+		"other.dir:/opt/other\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := readPropertiesValue(path, "sdk.dir")
+	if !ok || got != "/opt/android" {
+		t.Fatalf("spaced sdk.dir = %q ok=%v", got, ok)
+	}
+	got, ok = readPropertiesValue(path, "win.dir")
+	if !ok || got != `C:\Users\me\sdk` {
+		t.Fatalf("escaped win.dir = %q ok=%v", got, ok)
+	}
+	got, ok = readPropertiesValue(path, "other.dir")
+	if !ok || got != "/opt/other" {
+		t.Fatalf("colon other.dir = %q ok=%v", got, ok)
+	}
+}
+
+func TestFindAndroidSDKAcceptsSpacedSDKDir(t *testing.T) {
+	sdk := t.TempDir()
+	project := t.TempDir()
+	if err := os.WriteFile(filepath.Join(project, "local.properties"), []byte("sdk.dir = "+sdk+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ANDROID_HOME", "")
+	t.Setenv("ANDROID_SDK_ROOT", "")
+	got, err := FindAndroidSDK("", project)
+	if err != nil || got != sdk {
+		t.Fatalf("spaced sdk.dir = %q err=%v", got, err)
+	}
+}
+
 func TestFindAndroidSDKIgnoresParentLocalProperties(t *testing.T) {
 	parentSDK := t.TempDir()
 	projectSDK := t.TempDir()

@@ -146,16 +146,19 @@ func readPropertiesValue(path, key string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	prefix := key + "="
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(strings.TrimRight(line, "\r"))
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
 			continue
 		}
-		if !strings.HasPrefix(line, prefix) {
+		sep := strings.IndexAny(line, "=:")
+		if sep <= 0 {
 			continue
 		}
-		value := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+		if strings.TrimSpace(line[:sep]) != key {
+			continue
+		}
+		value := unescapeProperties(strings.TrimSpace(line[sep+1:]))
 		value = strings.Trim(value, `"'`)
 		if value == "" {
 			return "", false
@@ -163,6 +166,25 @@ func readPropertiesValue(path, key string) (string, bool) {
 		return value, true
 	}
 	return "", false
+}
+
+func unescapeProperties(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	for i := 0; i < len(value); i++ {
+		if value[i] != '\\' || i+1 == len(value) {
+			b.WriteByte(value[i])
+			continue
+		}
+		switch value[i+1] {
+		case '\\', ':', '=', ' ':
+			b.WriteByte(value[i+1])
+			i++
+		default:
+			b.WriteByte(value[i])
+		}
+	}
+	return b.String()
 }
 
 // PlatformLoad is the readable roots for one Android platform.

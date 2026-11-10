@@ -142,6 +142,35 @@ func TestAndroidPlatformNumericVersionMatchesNormalizedRoot(t *testing.T) {
 	}
 }
 
+func TestCatUsesFileIDCacheWithoutRediscoveringSDK(t *testing.T) {
+	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
+	t.Setenv("ANDROID_HOME", "")
+	t.Setenv("ANDROID_SDK_ROOT", "")
+	sdk := writeAndroidSDK(t, true)
+	app := NewApp()
+	app.Runner = rgOnlyRunner{}
+	searchOut, err := runCommand(app, []string{
+		"search", "ContextThemeWrapper",
+		"--module", "sdk.android:platform:android-36",
+		"--android-home", sdk,
+		"--project", t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("search error: %v\n%s", err, searchOut)
+	}
+	fileID := "sdk.android:platform:android-36!/android/app/Activity.java"
+	if !strings.Contains(searchOut, fileID) {
+		t.Fatalf("search = %s", searchOut)
+	}
+	catOut, err := runCommand(app, []string{"cat", fileID})
+	if err != nil {
+		t.Fatalf("cached cat error: %v\n%s", err, catOut)
+	}
+	if !strings.Contains(catOut, "ContextThemeWrapper") || strings.Contains(catOut, "Stub!") {
+		t.Fatalf("cached cat = %s", catOut)
+	}
+}
+
 func TestAndroidPlatformRequiresVersion(t *testing.T) {
 	app := NewApp()
 	app.Runner = rgOnlyRunner{}
