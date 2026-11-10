@@ -89,6 +89,7 @@ go test -cover ./...
 - Search output and file-id contract are API surfaces; keep formats stable and parseable:
   - Search: `<file-id> <line>:<col>:<match>`
   - File-id: `group:artifact:version!/path/inside/jar.ext`
+  - Android SDK platform sources use `sdk.android:platform:<platformId>!/path`, for example `sdk.android:platform:android-36!/android/app/Activity.java`. The caller passes the platform id. `--android-home` / MCP `androidHome` overrides SDK lookup (`local.properties` `sdk.dir`, then `android.dir`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`). This coordinate does not go through Gradle.
 - MCP tools are plaintext-first; keep tool outputs in `content` and avoid introducing structured payload dependencies.
 
 ## Code style

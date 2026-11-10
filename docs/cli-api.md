@@ -17,6 +17,8 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 - Gradle user home follows Gradle semantics: `--gradle-user-home <path>` overrides `GRADLE_USER_HOME`; otherwise `GRADLE_USER_HOME` overrides the default `~/.gradle`. Cache fallback uses the same effective user home as Gradle resolution.
 - In KMP projects, a base module selector such as `--module group:artifact` includes common/base sources and Gradle-selected platform variant source jars. `--targets` and `--config` narrow which variants can be selected. Output and file-ids still use each actual source jar coordinate.
 - `E_NO_SOURCES` may suggest `--project <included-build-root>` only when Gradle traversal actually discovered included builds. The CLI does not scan `build.gradle*`/`settings.gradle*` text for Android, KMP, or composite-build hints.
+- Android SDK platform sources are addressed as `sdk.android:platform:<platformId>`, for example `--module sdk.android:platform:android-36`. The version is the platform directory name (`android-36`, `android-36.1`, `android-Baklava`); a bare API number such as `36` is accepted and normalized. This coordinate does not use Gradle. `--android-home <path>` selects the SDK; otherwise ksrc reads `sdk.dir` / `android.dir` from `local.properties` in the project directory only, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`.
+- When `<sdk>/sources/<platformId>/` exists, it is the only source root. `platforms/<platformId>/android-stubs-src.jar` is used only when that directory is absent, and ksrc warns to run `android sdk install sources/<platformId>`. ksrc does not install the package.
 
 ### `ksrc search <pattern>`
 Search dependency sources for a pattern, optionally filtered by module/group.
@@ -42,6 +44,7 @@ If no selector is provided, `ksrc` defaults to `--all`. Use `--module`/`--group`
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
 - `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
+- `--android-home <path>`: Android SDK directory for `sdk.android:platform` (default: `local.properties` `sdk.dir` in the project directory, then `android.dir`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`). The same flag is accepted by `cat`, `open`, `where`, `deps`, `fetch`, and `resolve`.
 - `--refresh`: Re‑resolve and re‑download sources
 - `--offline`: Only use cached sources, error if missing
 - `--context <n>`: Show N lines before/after matches (rg `-C`)
@@ -123,6 +126,10 @@ ksrc deps [flags]
 
 **Flags**
 - `--project <path>`
+- `--module <glob>`
+- `--group <glob>`
+- `--artifact <glob>`
+- `--version <glob>`
 - `--scope <compile|runtime|test|all>`
 - `--config <name>` (glob supported; comma‑separated)
 - `--targets <list>` (comma‑separated)
@@ -135,7 +142,9 @@ ksrc deps [flags]
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
 
 **Output (default)**
-`group:artifact:version  [sources: yes|no]  [path: <gradle cache path>]`
+`group:artifact:version  [sources: yes|no]  [path: <source root>]`
+
+A selector is optional. With no selector, `deps` lists the Gradle resolution and does not add the Android platform. `--module sdk.android:platform:android-36` (or the same group, artifact, and version) resolves that platform only.
 
 ---
 
@@ -259,12 +268,15 @@ ksrc mcp [flags]
 - Transport is stdio only; clients should spawn `ksrc mcp` via `mcp.json`.
 - Outputs are plain text matching CLI formats.
 - Resolution tools accept optional `gradleUserHome`, equivalent to CLI `--gradle-user-home`.
+- Resolution tools accept optional `androidHome`, equivalent to CLI `--android-home`, for `sdk.android:platform`. Search uses `group`, `artifact`, and `version` (`sdk.android`, `platform`, `android-36`).
 
 ---
 
 ## File Identifier
-`<file-id>` is a fully qualified path to a file inside a source JAR:
+`<file-id>` is a fully qualified path to a file inside a source JAR or an Android platform source root:
 `group:artifact:version!/path/inside/jar.ext`
+
+Android platform example: `sdk.android:platform:android-36!/android/app/Activity.java`. The path is relative to `<sdk>/sources/android-36/` or, when only stubs are installed, to `android-stubs-src.jar`.
 
 Parse `<file-id>` by splitting once on `!/`. The left side is `group:artifact:version`; the right side is the slash-normalized path inside the source jar.
 
