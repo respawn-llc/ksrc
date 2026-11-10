@@ -84,7 +84,7 @@ func FindAndroidSDK(explicit, projectDir string) (string, error) {
 	explicit = strings.TrimSpace(explicit)
 	if explicit != "" {
 		if !isDir(explicit) {
-			return "", fmt.Errorf("Android SDK directory %q does not exist", explicit)
+			return "", fmt.Errorf("android SDK directory %q does not exist", explicit)
 		}
 		return explicit, nil
 	}
@@ -97,7 +97,7 @@ func FindAndroidSDK(explicit, projectDir string) (string, error) {
 			return dir, nil
 		}
 	}
-	return "", fmt.Errorf("Android SDK not found. Pass --android-home or set ANDROID_HOME")
+	return "", fmt.Errorf("android SDK not found. Pass --android-home or set ANDROID_HOME")
 }
 
 func isDir(path string) bool {
