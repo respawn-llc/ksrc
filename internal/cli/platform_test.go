@@ -102,6 +102,46 @@ func TestSearchAndroidPlatformStubSourcesWarn(t *testing.T) {
 	}
 }
 
+func TestAndroidPlatformNumericVersionMatchesNormalizedRoot(t *testing.T) {
+	sdk := writeAndroidSDK(t, true)
+	app := NewApp()
+	app.Runner = rgOnlyRunner{}
+	project := t.TempDir()
+	fileID := "sdk.android:platform:36!/android/app/Activity.java"
+
+	catOut, err := runCommand(app, []string{"cat", fileID, "--android-home", sdk, "--project", project})
+	if err != nil {
+		t.Fatalf("cat error: %v\n%s", err, catOut)
+	}
+	if !strings.Contains(catOut, "ContextThemeWrapper") || strings.Contains(catOut, "Stub!") {
+		t.Fatalf("cat = %s", catOut)
+	}
+
+	whereCoord, err := runCommand(app, []string{"where", "sdk.android:platform:36", "--android-home", sdk, "--project", project})
+	if err != nil {
+		t.Fatalf("where coord error: %v\n%s", err, whereCoord)
+	}
+	if !strings.Contains(whereCoord, "sources/android-36") {
+		t.Fatalf("where coord = %s", whereCoord)
+	}
+
+	whereFile, err := runCommand(app, []string{"where", fileID, "--android-home", sdk, "--project", project})
+	if err != nil {
+		t.Fatalf("where file-id error: %v\n%s", err, whereFile)
+	}
+	if !strings.Contains(whereFile, "sdk.android:platform:android-36!/android/app/Activity.java") || !strings.Contains(whereFile, "sources/android-36") {
+		t.Fatalf("where file-id = %s", whereFile)
+	}
+
+	fetchOut, err := runCommand(app, []string{"fetch", "sdk.android:platform:36", "--android-home", sdk, "--project", project})
+	if err != nil {
+		t.Fatalf("fetch error: %v\n%s", err, fetchOut)
+	}
+	if !strings.Contains(fetchOut, "sdk.android:platform:android-36|") || !strings.Contains(fetchOut, "sources/android-36") {
+		t.Fatalf("fetch = %s", fetchOut)
+	}
+}
+
 func TestAndroidPlatformRequiresVersion(t *testing.T) {
 	app := NewApp()
 	app.Runner = rgOnlyRunner{}
