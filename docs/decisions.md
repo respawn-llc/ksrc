@@ -114,6 +114,13 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - The rendered init script is written to a stable user-cache path keyed by template version and content hash, avoiding random temp init-script paths.
 - Tradeoff: the provider still performs project-local dependency introspection when Gradle calculates task input values on a cache miss. Repeated runs can reuse Configuration Cache and replay the stored records.
 
+## 2026-11-10: Android platform sources use an SDK coordinate
+- `sdk.android:platform:<platformId>` is a source coordinate stored in the Android SDK, not the Gradle cache. Callers pass the platform id the same way they pass a Maven version, for example `sdk.android:platform:android-36` or `sdk.android:platform:36`.
+- A Gradle project and subproject are not required. `--android-home` / MCP `androidHome` selects the SDK. When omitted, ksrc uses `sdk.dir` then `android.dir` from the nearest `local.properties`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`.
+- Full sources in `<sdk>/sources/<platformId>/` and `platforms/<platformId>/android-stubs-src.jar` are both attached. Search drops a stub hit when that inner path exists in the full tree. `cat` reads the full file when it exists.
+- ksrc does not install SDK packages. Stub-only and missing trees warn with `android sdk install sources/<platformId>`.
+- Rationale: an agent already knows the compile SDK it is reading and asks for that coordinate directly. Discovery through the Gradle classpath would require a project and module that this dependency does not live in.
+
 ## 2026-05-12: KMP base selectors include Gradle-selected external variants
 - When a selector matches a resolved KMP base component, the init script inspects Gradle's resolved variant metadata and follows `ResolvedVariantResult.externalVariant` owners exposed from Gradle module metadata `available-at`.
 - ksrc resolves detached `classifier: sources` artifacts for both the matched base component and any Gradle-selected external variant owners. This preserves common/base sources while adding platform source jars selected by Gradle.

@@ -41,4 +41,8 @@ type SourceJar struct {
 	Coord      Coord
 	Path       string
 	SelectedBy []Coord
+	// Stub marks a lower-fidelity root for Coord, such as Android platform
+	// stub sources. Search drops a stub hit when the same inner path exists
+	// in another root of the same coordinate.
+	Stub bool
 }

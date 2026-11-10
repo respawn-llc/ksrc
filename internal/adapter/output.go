@@ -81,39 +81,74 @@ func WriteFileIDPath(w io.Writer, fileID string, jarPath string) error {
 	return err
 }
 
+type depSourceView struct {
+	path  string
+	full  bool
+	stubs bool
+}
+
+func (v depSourceView) status() (string, string) {
+	switch {
+	case v.full:
+		return "yes", v.path
+	case v.stubs:
+		return "stubs", v.path
+	default:
+		return "no", ""
+	}
+}
+
+func noteDepSource(views map[string]*depSourceView, order *[]string, key, path string, stub bool) {
+	view, ok := views[key]
+	if !ok {
+		view = &depSourceView{}
+		views[key] = view
+		*order = append(*order, key)
+	}
+	if path == "" {
+		return
+	}
+	if stub {
+		view.stubs = true
+		if view.path == "" {
+			view.path = path
+		}
+		return
+	}
+	view.full = true
+	view.path = path
+}
+
 func WriteDepsOutput(w io.Writer, sources []resolve.SourceJar, deps []resolve.Coord) error {
-	sourceByCoord := make(map[string]string)
+	views := make(map[string]*depSourceView)
+	order := make([]string, 0, len(sources))
 	for _, source := range sources {
-		sourceByCoord[source.Coord.String()] = source.Path
+		noteDepSource(views, &order, source.Coord.String(), source.Path, source.Stub)
 	}
 
 	seen := make(map[string]struct{})
-	for _, dep := range deps {
-		key := dep.String()
+	write := func(key string) error {
 		if _, ok := seen[key]; ok {
-			continue
+			return nil
 		}
 		seen[key] = struct{}{}
-		path := sourceByCoord[key]
-		hasSources := "no"
-		if path != "" {
-			hasSources = "yes"
+		status, path := "no", ""
+		if view, ok := views[key]; ok {
+			status, path = view.status()
 		}
-		if _, err := fmt.Fprintf(w, "%s  [sources: %s]  [path: %s]\n", key, hasSources, path); err != nil {
+		_, err := fmt.Fprintf(w, "%s  [sources: %s]  [path: %s]\n", key, status, path)
+		return err
+	}
+	for _, dep := range deps {
+		if err := write(dep.String()); err != nil {
 			return err
 		}
 	}
-
 	if len(deps) != 0 {
 		return nil
 	}
-	for _, source := range sources {
-		key := source.Coord.String()
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		if _, err := fmt.Fprintf(w, "%s  [sources: yes]  [path: %s]\n", key, source.Path); err != nil {
+	for _, key := range order {
+		if err := write(key); err != nil {
 			return err
 		}
 	}

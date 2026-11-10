@@ -92,6 +92,7 @@ type SearchInput struct {
 	Scope       string   `json:"scope,omitempty" jsonschema:"dependency scope (optional, default: compile)"`
 	Targets     []string `json:"targets,omitempty" jsonschema:"KMP target filters (optional, default: all targets)"`
 	GradleHome  string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
+	AndroidHome string   `json:"androidHome,omitempty" jsonschema:"Android SDK directory for sdk.android:platform (optional, default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)"`
 }
 
 type CatInput struct {
@@ -106,6 +107,7 @@ type CatInput struct {
 	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript in fallback resolution (optional, default: true)"`
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds in fallback resolution (optional, default: true)"`
 	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home for fallback resolution (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
+	AndroidHome   string   `json:"androidHome,omitempty" jsonschema:"Android SDK directory for sdk.android:platform (optional, default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)"`
 }
 
 type DepsInput struct {
@@ -121,6 +123,7 @@ type DepsInput struct {
 	Artifact      string   `json:"artifact,omitempty" jsonschema:"artifact filter (optional, default: all artifacts)"`
 	Version       string   `json:"version,omitempty" jsonschema:"version filter (optional, default: all versions)"`
 	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
+	AndroidHome   string   `json:"androidHome,omitempty" jsonschema:"Android SDK directory for sdk.android:platform (optional, default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)"`
 }
 
 type FetchInput struct {
@@ -132,6 +135,7 @@ type FetchInput struct {
 	Buildscript   *bool  `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
 	IncludeBuilds *bool  `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
 	GradleHome    string `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
+	AndroidHome   string `json:"androidHome,omitempty" jsonschema:"Android SDK directory for sdk.android:platform (optional, default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)"`
 }
 
 type ResolveInput struct {
@@ -147,6 +151,7 @@ type ResolveInput struct {
 	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
 	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
+	AndroidHome   string   `json:"androidHome,omitempty" jsonschema:"Android SDK directory for sdk.android:platform (optional, default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)"`
 }
 
 type WhereInput struct {
@@ -163,4 +168,5 @@ type WhereInput struct {
 	Buildscript   *bool    `json:"buildscript,omitempty" jsonschema:"include buildscript (optional, default: true)"`
 	IncludeBuilds *bool    `json:"includeBuilds,omitempty" jsonschema:"include builds (optional, default: true)"`
 	GradleHome    string   `json:"gradleUserHome,omitempty" jsonschema:"Gradle user home (optional, default: GRADLE_USER_HOME or ~/.gradle)"`
+	AndroidHome   string   `json:"androidHome,omitempty" jsonschema:"Android SDK directory for sdk.android:platform (optional, default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)"`
 }

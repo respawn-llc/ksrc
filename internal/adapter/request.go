@@ -20,6 +20,7 @@ type ResolveSpec struct {
 	IncludeIncludedBuilds bool
 	Dep                   string
 	GradleUserHome        string
+	AndroidHome           string
 	ApplyFilters          bool
 	AllowCacheFallback    bool
 }

@@ -195,7 +195,7 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 	searchDirs := make([]string, 0, len(opts.Jars))
 	seenDirs := make(map[string]struct{}, len(opts.Jars))
 	for _, j := range opts.Jars {
-		dir, err := extractJarCached(j.Path)
+		dir, err := searchRoot(j.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +236,50 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 	parsed := parseRgOutput(stdout, func(filePath string) (resolve.SourceJar, string, bool) {
 		return mapToSource(extractRoots, filePath)
 	})
-	return suppressSelectedByDuplicateMatches(parsed.Matches, selectedByCoordsByJarPath(extractedSources)), nil
+	matches := suppressSelectedByDuplicateMatches(parsed.Matches, selectedByCoordsByJarPath(extractedSources))
+	return suppressPlatformStubMatches(matches, opts.Jars), nil
+}
+
+func searchRoot(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return path, nil
+	}
+	return extractJarCached(path)
+}
+
+func suppressPlatformStubMatches(matches []Match, jars []resolve.SourceJar) []Match {
+	fullByCoord := make(map[string]string)
+	stubPaths := make(map[string]struct{})
+	for _, jar := range jars {
+		if jar.Stub {
+			stubPaths[jar.Path] = struct{}{}
+			continue
+		}
+		info, err := os.Stat(jar.Path)
+		if err == nil && info.IsDir() {
+			fullByCoord[jar.Coord.String()] = jar.Path
+		}
+	}
+	if len(stubPaths) == 0 || len(fullByCoord) == 0 {
+		return matches
+	}
+	kept := make([]Match, 0, len(matches))
+	for _, match := range matches {
+		if _, stub := stubPaths[match.JarPath]; stub {
+			if root, ok := fullByCoord[match.Coord.String()]; ok {
+				candidate := filepath.Join(root, filepath.FromSlash(match.InnerPath))
+				if info, err := os.Stat(candidate); err == nil && info.Mode().IsRegular() {
+					continue
+				}
+			}
+		}
+		kept = append(kept, match)
+	}
+	return kept
 }
 
 func selectedByCoordsByJarPath(extractedSources []extractedSource) map[string][]resolve.Coord {

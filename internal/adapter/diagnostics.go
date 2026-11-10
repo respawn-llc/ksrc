@@ -42,6 +42,16 @@ func NoSourcesHint(group, artifact, version string) string {
 	group = strings.TrimSpace(group)
 	artifact = strings.TrimSpace(artifact)
 	version = strings.TrimSpace(version)
+	if group == resolve.PlatformGroup && artifact == resolve.PlatformArtifact {
+		platformID := version
+		if normalized, err := resolve.NormalizePlatformID(version); err == nil {
+			platformID = normalized
+		}
+		if platformID != "" {
+			return fmt.Sprintf("Install full sources with: %s", resolve.PlatformInstallCommand(platformID))
+		}
+		return "Platform version is required, for example sdk.android:platform:android-36."
+	}
 	if group != "" && artifact != "" && version != "" {
 		return fmt.Sprintf("Try: ksrc fetch %s:%s:%s to download sources.", group, artifact, version)
 	}
