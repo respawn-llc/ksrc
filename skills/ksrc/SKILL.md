@@ -12,14 +12,14 @@ If you want faster execution & less noise, consider adding:
 
 KMP note: `--module group:artifact` searches common/base sources plus Gradle-selected platform variant source jars by default. Use `--targets` or `--config` to narrow variants.
 
-Android SDK platform sources live outside Gradle. Pass the platform id the way you pass a Maven version. `36` and `android-36` are the same platform:
+For Android SDK sources, select the platform explicitly:
 
 ```bash
 ksrc search "class Activity " --module sdk.android:platform:android-36
-ksrc cat sdk.android:platform:android-36!/android/app/Activity.java --lines 767,790
+ksrc cat sdk.android:platform:android-36!/android/app/Activity.java --lines 1,40
 ```
 
-`--android-home <path>` sets the SDK directory. If omitted, ksrc checks `local.properties` in the project directory (`sdk.dir`, then `android.dir`), then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. No `--project` or `--subproject` is required. When `sources/android-36` is installed it is the only root. Otherwise search uses `android-stubs-src.jar` and warns to run `android sdk install sources/android-36`. ksrc does not install it.
+Use `--android-home <path>` to select an SDK. See [Android SDK sources](https://github.com/respawn-llc/ksrc/blob/main/docs/cli-api.md#android-sdk-sources) for platform versions, SDK lookup, and installation.
 
 2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 

@@ -17,8 +17,13 @@ This doc mirrors `ksrc --help` for flags and outputs. Architecture decisions and
 - Gradle user home follows Gradle semantics: `--gradle-user-home <path>` overrides `GRADLE_USER_HOME`; otherwise `GRADLE_USER_HOME` overrides the default `~/.gradle`. Cache fallback uses the same effective user home as Gradle resolution.
 - In KMP projects, a base module selector such as `--module group:artifact` includes common/base sources and Gradle-selected platform variant source jars. `--targets` and `--config` narrow which variants can be selected. Output and file-ids still use each actual source jar coordinate.
 - `E_NO_SOURCES` may suggest `--project <included-build-root>` only when Gradle traversal actually discovered included builds. The CLI does not scan `build.gradle*`/`settings.gradle*` text for Android, KMP, or composite-build hints.
-- Android SDK platform sources are addressed as `sdk.android:platform:<platformId>`, for example `--module sdk.android:platform:android-36`. The version is the platform directory name (`android-36`, `android-36.1`, `android-Baklava`); a bare API number such as `36` is accepted and normalized. This coordinate does not use Gradle. `--android-home <path>` selects the SDK; otherwise ksrc reads `sdk.dir` / `android.dir` from `local.properties` in the project directory only, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`.
-- When `<sdk>/sources/<platformId>/` exists, it is the only source root. `platforms/<platformId>/android-stubs-src.jar` is used only when that directory is absent, and ksrc warns to run `android sdk install sources/<platformId>`. ksrc does not install the package.
+### Android SDK sources
+
+Use `--module sdk.android:platform:<platformId>` to select Android platform sources, including outside a Gradle project. The version is the SDK platform directory name, such as `android-36`, `android-36.1`, or `android-Baklava`. Numeric versions such as `36` normalize to `android-36`.
+
+SDK lookup order is `--android-home <path>`, `sdk.dir` then `android.dir` from `local.properties` in the `--project` directory, `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. Relative paths in `local.properties` resolve against its directory. The `--android-home` flag is accepted by `search`, `cat`, `open`, `where`, `deps`, `fetch`, and `resolve`.
+
+Full sources in `<sdk>/sources/<platformId>/` take precedence over `platforms/<platformId>/android-stubs-src.jar`. Stub-only or missing sources produce an installation warning. Install full sources with `android sdk install sources/<platformId>`.
 
 ### `ksrc search <pattern>`
 Search dependency sources for a pattern, optionally filtered by module/group.
@@ -44,7 +49,7 @@ If no selector is provided, `ksrc` defaults to `--all`. Use `--module`/`--group`
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
 - `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
-- `--android-home <path>`: Android SDK directory for `sdk.android:platform` (default: `local.properties` `sdk.dir` in the project directory, then `android.dir`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`). The same flag is accepted by `cat`, `open`, `where`, `deps`, `fetch`, and `resolve`.
+- `--android-home <path>`: Android SDK directory. See [Android SDK sources](#android-sdk-sources).
 - `--refresh`: Re‑resolve and re‑download sources
 - `--offline`: Only use cached sources, error if missing
 - `--context <n>`: Show N lines before/after matches (rg `-C`)
@@ -144,7 +149,7 @@ ksrc deps [flags]
 **Output (default)**
 `group:artifact:version  [sources: yes|no]  [path: <source root>]`
 
-A selector is optional. With no selector, `deps` lists the Gradle resolution and does not add the Android platform. `--module sdk.android:platform:android-36` (or the same group, artifact, and version) resolves that platform only.
+`deps --module sdk.android:platform:android-36` lists the selected Android platform. An unfiltered `deps` command lists the project's Gradle dependencies.
 
 ---
 
