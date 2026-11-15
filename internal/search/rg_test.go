@@ -480,3 +480,50 @@ func TestChunkSearchDirsKeepsEmptyInvocation(t *testing.T) {
 		t.Fatalf("expected single empty chunk, got %v", chunks)
 	}
 }
+
+func TestWindowsArgLen(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"", 2},                          // ""
+		{"abc", 3},                       // abc
+		{"a b", 5},                       // "a b"
+		{`C:\Program Files\x`, 20},       // "C:\Program Files\x"
+		{`a"b`, 6},                       // "a\"b"
+		{`a\"b`, 8},                      // "a\\\"b"
+		{`C:\x\`, 8},                     // "C:\x\\"
+		{`fun <T> foo("bar qux")\(`, 28}, // quotes (2) + len 24 + two escaped quotes
+	}
+	for _, tc := range cases {
+		if got := windowsArgLen(tc.in); got != tc.want {
+			t.Errorf("windowsArgLen(%q) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestChunkByBudgetKeepsEscapedCommandLineWithinWindowsLimit(t *testing.T) {
+	pattern := `fun (bar|"baz qux")\(` // space- and quote-heavy search pattern
+	baseArgs := []string{"--json", "--color=never", "--", pattern}
+	dir := `C:\Users\User Name\AppData\Local\ksrc\search-extracted-v1\` + strings.Repeat("a", 40)
+	dirs := make([]string, 600)
+	for i := range dirs {
+		dirs[i] = dir
+	}
+	base := windowsArgsLen(baseArgs) + 1 // separator before the first dir
+	chunks := chunkByBudget(base, dirs, rgCmdLineBudget)
+	if len(chunks) < 2 {
+		t.Fatalf("expected multiple chunks, got %d", len(chunks))
+	}
+	total := 0
+	for i, chunk := range chunks {
+		lineLen := windowsArgsLen(append(append([]string{}, baseArgs...), chunk...))
+		if lineLen > windowsCmdLineLimit {
+			t.Fatalf("chunk %d escaped command line %d exceeds Windows limit %d", i, lineLen, windowsCmdLineLimit)
+		}
+		total += len(chunk)
+	}
+	if total != len(dirs) {
+		t.Fatalf("expected %d total dirs, got %d", len(dirs), total)
+	}
+}
