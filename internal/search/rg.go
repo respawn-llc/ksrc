@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/respawn-app/ksrc/internal/cache"
 	"github.com/respawn-app/ksrc/internal/executil"
 	"github.com/respawn-app/ksrc/internal/resolve"
 )
@@ -318,9 +319,8 @@ func isNoMatches(err error) bool {
 }
 
 const (
-	extractCacheDirEnv   = "KSRC_EXTRACT_CACHE_DIR"
-	extractCacheReady    = ".ksrc-ready"
-	extractCacheRootName = "ksrc/search-extracted-v1"
+	extractCacheDirEnv = cache.ExtractDirEnv
+	extractCacheReady  = ".ksrc-ready"
 )
 
 var extractCacheLocks sync.Map
@@ -407,22 +407,11 @@ func ensureWritableExtractCacheRoot(root string) error {
 }
 
 func searchExtractCacheRoot() (string, error) {
-	if dir := strings.TrimSpace(os.Getenv(extractCacheDirEnv)); dir != "" {
-		abs, err := filepath.Abs(dir)
-		if err != nil {
-			return "", err
-		}
-		return filepath.Clean(abs), nil
-	}
-	base, err := userCacheDir()
-	if err != nil {
-		return tempExtractCacheRoot(), nil
-	}
-	return filepath.Join(base, extractCacheRootName), nil
+	return cache.ExtractRoot(userCacheDir)
 }
 
 func tempExtractCacheRoot() string {
-	return filepath.Join(os.TempDir(), extractCacheRootName)
+	return cache.TempExtractRoot()
 }
 
 func extractCacheKey(src string) (string, error) {
