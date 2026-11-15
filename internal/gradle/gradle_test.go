@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -34,7 +35,11 @@ func TestFindGradlePrefersLocalWrapper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("findGradle: %v", err)
 	}
-	if cmd != LocalWrapperCommand() {
+	want := LocalWrapperCommand()
+	if runtime.GOOS == "windows" {
+		want = wrapper
+	}
+	if cmd != want {
 		t.Fatalf("expected local wrapper, got %q", cmd)
 	}
 }
@@ -401,6 +406,7 @@ func TestWriteInitScriptUsesStableCachePath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+	t.Setenv("LocalAppData", filepath.Join(home, ".cache"))
 
 	first, firstCleanup, err := writeInitScript()
 	if err != nil {
@@ -432,6 +438,7 @@ func TestWriteInitScriptCachePathInvalidatesOnVersionOrContentChange(t *testing.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(home, ".cache"))
+	t.Setenv("LocalAppData", filepath.Join(home, ".cache"))
 
 	base, baseCleanup, err := writeInitScriptContent("v-test", "println 'one'\n")
 	if err != nil {
@@ -465,6 +472,7 @@ func TestWriteInitScriptFallsBackToTempDirWhenUserCacheUnavailable(t *testing.T)
 	}
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CACHE_HOME", blockingFile)
+	t.Setenv("LocalAppData", blockingFile)
 
 	path, cleanup, err := writeInitScriptContent("v-test", "println 'fallback'\n")
 	if err != nil {
@@ -485,6 +493,9 @@ func TestWriteInitScriptFallsBackToTempDirWhenUserCacheUnavailable(t *testing.T)
 }
 
 func TestWriteInitScriptFallsBackToTempDirWhenUserCacheReadOnly(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory access uses ACLs, not chmod write bits")
+	}
 	home := t.TempDir()
 	cacheRoot := filepath.Join(home, ".cache")
 	cacheDir := filepath.Join(cacheRoot, "ksrc", "gradle-init")

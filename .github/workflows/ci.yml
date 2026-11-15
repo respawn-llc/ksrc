@@ -50,6 +50,46 @@ jobs:
       - name: Test
         run: go test ./...
 
+  smoke-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Set up Java
+        uses: actions/setup-java@v5.2.0
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.4.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+
+      - name: Install ripgrep
+        shell: pwsh
+        run: |
+          choco install ripgrep --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "ripgrep installation failed" }
+
+      - name: Test platform-independent packages
+        shell: pwsh
+        run: |
+          go test ./internal/cat ./internal/resolve ./internal/executil
+          if ($LASTEXITCODE -ne 0) { throw "Windows package tests failed" }
+          go test ./internal/search
+          if ($LASTEXITCODE -ne 0) { throw "Windows search argument tests failed" }
+          go test ./internal/gradle -run 'Test(FindGradle|WriteInitScript|InitScriptMatchesGolden)'
+          if ($LASTEXITCODE -ne 0) { throw "Windows Gradle regression tests failed" }
+          go test ./internal/cli -run TestPager
+          if ($LASTEXITCODE -ne 0) { throw "Windows pager tests failed" }
+
+      - name: Test Windows installation and core workflows
+        shell: pwsh
+        run: ./scripts/windows-smoke.ps1
+
   smoke-sample:
     runs-on: ubuntu-latest
     steps:

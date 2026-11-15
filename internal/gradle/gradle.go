@@ -366,7 +366,10 @@ func formatGradleInvocation(cmd string, args []string, projectDir string, projec
 }
 
 func findGradle(runner executil.Runner, projectDir string, rootDir string) (string, error) {
-	if localWrapperPath(projectDir) != "" {
+	if wrapper := localWrapperPath(projectDir); wrapper != "" {
+		if runtime.GOOS == "windows" {
+			return wrapper, nil
+		}
 		return LocalWrapperCommand(), nil
 	}
 	if rootDir != "" && !samePath(projectDir, rootDir) {
@@ -404,12 +407,10 @@ func WrapperFileName() string {
 }
 
 // LocalWrapperCommand returns the wrapper command used when the wrapper lives
-// in the project directory. Go's os/exec runs .bat/.cmd via cmd.exe, which is
-// the only way to execute the wrapper natively on Windows. The path must use
-// Windows separators because cmd.exe cannot parse POSIX-style "./" prefixes.
+// in the project directory, for diagnostics.
 func LocalWrapperCommand() string {
 	if runtime.GOOS == "windows" {
-		return `.\\gradlew.bat`
+		return `.\gradlew.bat`
 	}
 	return "./gradlew"
 }

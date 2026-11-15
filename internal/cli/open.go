@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/respawn-app/ksrc/internal/adapter"
@@ -87,10 +86,7 @@ func newOpenCmd(app *App) *cobra.Command {
 			}
 
 			pager := os.Getenv("PAGER")
-			if pager == "" {
-				pager = "less -R"
-			}
-			cmdExec := exec.Command("sh", "-c", pager)
+			cmdExec := pagerCommand(pager)
 			cmdExec.Stdin = strings.NewReader(string(data))
 			cmdExec.Stdout = cmd.OutOrStdout()
 			cmdExec.Stderr = cmd.ErrOrStderr()
