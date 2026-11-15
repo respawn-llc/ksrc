@@ -437,3 +437,46 @@ func rgEventLine(t *testing.T, eventType string, path string, text string, lineN
 	}
 	return string(encoded) + "\n"
 }
+
+func TestChunkByBudgetSingleChunkWhenUnderBudget(t *testing.T) {
+	dirs := []string{"dir-a", "dir-b", "dir-c"}
+	chunks := chunkByBudget(10, dirs, 100)
+	if len(chunks) != 1 || len(chunks[0]) != 3 {
+		t.Fatalf("expected single chunk of 3 dirs, got %v", chunks)
+	}
+}
+
+func TestChunkByBudgetSplitsWhenOverBudget(t *testing.T) {
+	dir := strings.Repeat("x", 50)
+	dirs := []string{dir, dir, dir, dir}
+	const base = 10
+	const budget = 100
+	chunks := chunkByBudget(base, dirs, budget)
+	if len(chunks) < 2 {
+		t.Fatalf("expected multiple chunks, got %d", len(chunks))
+	}
+	total := 0
+	for i, chunk := range chunks {
+		if len(chunk) == 0 {
+			t.Fatalf("chunk %d is empty", i)
+		}
+		size := base
+		for _, d := range chunk {
+			size += len(d) + 3
+		}
+		if size > budget {
+			t.Fatalf("chunk %d exceeds budget: %d > %d", i, size, budget)
+		}
+		total += len(chunk)
+	}
+	if total != len(dirs) {
+		t.Fatalf("expected %d total dirs, got %d", len(dirs), total)
+	}
+}
+
+func TestChunkSearchDirsKeepsEmptyInvocation(t *testing.T) {
+	chunks := chunkSearchDirs([]string{"--json", "--", "pat"}, nil)
+	if len(chunks) != 1 || len(chunks[0]) != 0 {
+		t.Fatalf("expected single empty chunk, got %v", chunks)
+	}
+}
