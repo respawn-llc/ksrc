@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/fileidcache"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
 )
 
 func TestCachedAndroidPlatformFollowupWarnsAfterSourcesUninstalled(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/resolution"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func WriteDiagnostics(w io.Writer, meta resolution.ResolveMeta, verbose bool) {

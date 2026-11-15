@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
-	"github.com/respawn-app/ksrc/internal/search"
+	"github.com/respawn-llc/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/search"
 )
 
 func TestWriteDepsOutputDeduplicatesAndFallsBackToSources(t *testing.T) {

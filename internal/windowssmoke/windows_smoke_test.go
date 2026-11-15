@@ -44,7 +44,7 @@ func TestWindowsSmoke(t *testing.T) {
 	binaryName := fmt.Sprintf("ksrc_%s_windows_%s.exe", version, runtime.GOARCH)
 	binary := filepath.Join(root, binaryName)
 	run(t, repo, "go", "build", "-trimpath", "-buildvcs=false",
-		"-ldflags", "-X github.com/respawn-app/ksrc/internal/cli.Version="+version,
+		"-ldflags", "-X github.com/respawn-llc/ksrc/internal/cli.Version="+version,
 		"-o", binary, "./cmd/ksrc")
 	archive := makeZip(t, binaryName, readFile(t, binary))
 	archivePath := fmt.Sprintf("/v%s/ksrc_%s_windows_%s.zip", version, version, runtime.GOARCH)

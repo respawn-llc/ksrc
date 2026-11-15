@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/cat"
-	"github.com/respawn-app/ksrc/internal/testutil"
+	"github.com/respawn-llc/ksrc/internal/cat"
+	"github.com/respawn-llc/ksrc/internal/testutil"
 )
 
 func TestFindFileInSourcesAllowsEmptyFile(t *testing.T) {

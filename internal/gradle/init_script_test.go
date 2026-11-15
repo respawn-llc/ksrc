@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type selectorProbeCoord struct {

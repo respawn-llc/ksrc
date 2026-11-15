@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/respawn-app/ksrc/internal/gradle"
-	"github.com/respawn-app/ksrc/internal/gradlehome"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/gradle"
+	"github.com/respawn-llc/ksrc/internal/gradlehome"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
 

@@ -3,7 +3,7 @@ package cli
 import (
 	"context"
 
-	"github.com/respawn-app/ksrc/internal/mcpserver"
+	"github.com/respawn-llc/ksrc/internal/mcpserver"
 	"github.com/spf13/cobra"
 )
 

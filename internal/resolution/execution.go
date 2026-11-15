@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/respawn-app/ksrc/internal/gradle"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/gradle"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type executionStopReason string

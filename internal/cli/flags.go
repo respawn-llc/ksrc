@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/gradle"
-	"github.com/respawn-app/ksrc/internal/resolution"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/gradle"
+	"github.com/respawn-llc/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
 

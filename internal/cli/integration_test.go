@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/gradle"
-	"github.com/respawn-app/ksrc/internal/testutil"
+	"github.com/respawn-llc/ksrc/internal/gradle"
+	"github.com/respawn-llc/ksrc/internal/testutil"
 )
 
 func TestSearchAndCatIntegration(t *testing.T) {

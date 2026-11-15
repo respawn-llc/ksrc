@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/gradlehome"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/gradlehome"
 )
 
 type SingleResolver interface {

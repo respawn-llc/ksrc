@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
 

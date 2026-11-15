@@ -4,9 +4,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/respawn-app/ksrc/internal/fileidcache"
-	"github.com/respawn-app/ksrc/internal/resolve"
-	"github.com/respawn-app/ksrc/internal/search"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
+	"github.com/respawn-llc/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/search"
 )
 
 func TrackSearchMatches(matches []search.Match) error {

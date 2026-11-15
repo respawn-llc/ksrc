@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func TestSearchPlatformRootOmitsStubOnlyText(t *testing.T) {

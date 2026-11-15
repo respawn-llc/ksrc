@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type FileLocation struct {

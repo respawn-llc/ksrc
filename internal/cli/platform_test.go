@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/fileidcache"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
 )
 
 type rgOnlyRunner struct {

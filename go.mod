@@ -1,4 +1,4 @@
-module github.com/respawn-app/ksrc
+module github.com/respawn-llc/ksrc
 
 go 1.27.4
 

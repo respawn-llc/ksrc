@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/executil"
 )
 
 type Options struct {

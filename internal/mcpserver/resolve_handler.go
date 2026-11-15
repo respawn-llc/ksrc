@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/adapter"
 )
 
 func (s *toolState) handleResolve(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {

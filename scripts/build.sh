@@ -51,7 +51,7 @@ mkdir -p "$out_dir"
 CGO_ENABLED="${CGO_ENABLED:-0}" go build \
   -trimpath \
   -buildvcs=false \
-  -ldflags "-s -w -X github.com/respawn-app/ksrc/internal/cli.Version=${VERSION}" \
+  -ldflags "-s -w -X github.com/respawn-llc/ksrc/internal/cli.Version=${VERSION}" \
   -o "$OUT" \
   ./cmd/ksrc
 

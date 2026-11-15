@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/cat"
-	"github.com/respawn-app/ksrc/internal/fileidcache"
-	"github.com/respawn-app/ksrc/internal/testutil"
+	"github.com/respawn-llc/ksrc/internal/cat"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
+	"github.com/respawn-llc/ksrc/internal/testutil"
 )
 
 type toolSession interface {

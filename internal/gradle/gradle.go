@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type ResolveOptions struct {

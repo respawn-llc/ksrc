@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/fileidcache"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func TestPlatformFollowupReselectsSourcesFromCachedStub(t *testing.T) {

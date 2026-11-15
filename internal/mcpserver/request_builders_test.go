@@ -4,9 +4,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/cli"
-	"github.com/respawn-app/ksrc/internal/mcpserver"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/cli"
+	"github.com/respawn-llc/ksrc/internal/mcpserver"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func TestBuildSearchSpecMatchesCLIRequest(t *testing.T) {

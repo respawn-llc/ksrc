@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/cache"
+	"github.com/respawn-llc/ksrc/internal/cache"
 )
 
 type entry struct {

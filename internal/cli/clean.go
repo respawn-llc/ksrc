@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/respawn-app/ksrc/internal/cache"
+	"github.com/respawn-llc/ksrc/internal/cache"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )

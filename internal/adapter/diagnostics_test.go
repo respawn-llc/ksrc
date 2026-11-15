@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/resolution"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func TestWriteDiagnosticsHandlesNilAndFormatsWarningsAndVerbose(t *testing.T) {

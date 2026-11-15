@@ -13,9 +13,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/respawn-app/ksrc/internal/cache"
-	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/cache"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type Match struct {

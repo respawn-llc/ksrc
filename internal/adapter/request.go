@@ -1,6 +1,6 @@
 package adapter
 
-import "github.com/respawn-app/ksrc/internal/resolution"
+import "github.com/respawn-llc/ksrc/internal/resolution"
 
 type ResolveSpec struct {
 	Project               string

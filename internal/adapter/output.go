@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
-	"github.com/respawn-app/ksrc/internal/search"
+	"github.com/respawn-llc/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/search"
 )
 
 func FormatRGArgs(plan search.ExecPlan) string {

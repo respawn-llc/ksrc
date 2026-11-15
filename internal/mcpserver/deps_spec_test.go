@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/adapter"
 )
 
 func TestBuildDepsSpecCarriesPlatformSelectorBeforeResolve(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/cache"
+	"github.com/respawn-llc/ksrc/internal/cache"
 )
 
 func isolateCleanCaches(t *testing.T) string {

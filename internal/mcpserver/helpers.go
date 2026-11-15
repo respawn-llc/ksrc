@@ -1,6 +1,6 @@
 package mcpserver
 
-import "github.com/respawn-app/ksrc/internal/adapter"
+import "github.com/respawn-llc/ksrc/internal/adapter"
 
 func cleanList(values []string) []string { return adapter.CleanList(values) }
 
