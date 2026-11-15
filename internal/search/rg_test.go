@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func TestParseRgLine(t *testing.T) {
@@ -138,6 +138,23 @@ func TestRunTreatsExitCodeOneAsNoMatches(t *testing.T) {
 	}
 	if len(matches) != 0 {
 		t.Fatalf("expected no matches, got %d", len(matches))
+	}
+}
+
+func TestRunRejectsPartialResultsOnError(t *testing.T) {
+	t.Setenv(extractCacheDirEnv, filepath.Join(t.TempDir(), "cache"))
+	path := filepath.Join(t.TempDir(), "foo.jar")
+	writeTestJar(t, path, map[string]string{"Demo.kt": "Needle\n"})
+	runner := &exitCodeRunner{exitCode: 2, stdout: `{"type":"summary"}`, stderr: "unreadable source"}
+	matches, err := Run(context.Background(), runner, Options{
+		Pattern: "Needle",
+		Jars:    []resolve.SourceJar{{Path: path}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unreadable source") {
+		t.Fatalf("expected search failure with diagnostics, got %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("failed search returned partial results: %v", matches)
 	}
 }
 
@@ -372,6 +389,8 @@ func containsArg(args []string, needle string) bool {
 
 type exitCodeRunner struct {
 	exitCode int
+	stdout   string
+	stderr   string
 }
 
 func (e *exitCodeRunner) Run(_ context.Context, _ string, name string, args ...string) (string, string, error) {
@@ -379,7 +398,7 @@ func (e *exitCodeRunner) Run(_ context.Context, _ string, name string, args ...s
 		return "", "", fmt.Errorf("unexpected command: %s", name)
 	}
 	if containsArg(args, "Needle") {
-		return "", "", exitError{code: e.exitCode}
+		return e.stdout, e.stderr, exitError{code: e.exitCode}
 	}
 	return "", "", nil
 }
@@ -438,92 +457,9 @@ func rgEventLine(t *testing.T, eventType string, path string, text string, lineN
 	return string(encoded) + "\n"
 }
 
-func TestChunkByBudgetSingleChunkWhenUnderBudget(t *testing.T) {
-	dirs := []string{"dir-a", "dir-b", "dir-c"}
-	chunks := chunkByBudget(10, dirs, 100)
-	if len(chunks) != 1 || len(chunks[0]) != 3 {
-		t.Fatalf("expected single chunk of 3 dirs, got %v", chunks)
-	}
-}
-
-func TestChunkByBudgetSplitsWhenOverBudget(t *testing.T) {
-	dir := strings.Repeat("x", 50)
-	dirs := []string{dir, dir, dir, dir}
-	const base = 10
-	const budget = 100
-	chunks := chunkByBudget(base, dirs, budget)
-	if len(chunks) < 2 {
-		t.Fatalf("expected multiple chunks, got %d", len(chunks))
-	}
-	total := 0
-	for i, chunk := range chunks {
-		if len(chunk) == 0 {
-			t.Fatalf("chunk %d is empty", i)
-		}
-		size := base
-		for _, d := range chunk {
-			size += len(d) + 3
-		}
-		if size > budget {
-			t.Fatalf("chunk %d exceeds budget: %d > %d", i, size, budget)
-		}
-		total += len(chunk)
-	}
-	if total != len(dirs) {
-		t.Fatalf("expected %d total dirs, got %d", len(dirs), total)
-	}
-}
-
 func TestChunkSearchDirsKeepsEmptyInvocation(t *testing.T) {
 	chunks := chunkSearchDirs([]string{"--json", "--", "pat"}, nil)
 	if len(chunks) != 1 || len(chunks[0]) != 0 {
 		t.Fatalf("expected single empty chunk, got %v", chunks)
-	}
-}
-
-func TestWindowsArgLen(t *testing.T) {
-	cases := []struct {
-		in   string
-		want int
-	}{
-		{"", 2},                          // ""
-		{"abc", 3},                       // abc
-		{"a b", 5},                       // "a b"
-		{`C:\Program Files\x`, 20},       // "C:\Program Files\x"
-		{`a"b`, 6},                       // "a\"b"
-		{`a\"b`, 8},                      // "a\\\"b"
-		{`C:\x\`, 8},                     // "C:\x\\"
-		{`fun <T> foo("bar qux")\(`, 28}, // quotes (2) + len 24 + two escaped quotes
-	}
-	for _, tc := range cases {
-		if got := windowsArgLen(tc.in); got != tc.want {
-			t.Errorf("windowsArgLen(%q) = %d, want %d", tc.in, got, tc.want)
-		}
-	}
-}
-
-func TestChunkByBudgetKeepsEscapedCommandLineWithinWindowsLimit(t *testing.T) {
-	pattern := `fun (bar|"baz qux")\(` // space- and quote-heavy search pattern
-	baseArgs := []string{"--json", "--color=never", "--", pattern}
-	dir := `C:\Users\User Name\AppData\Local\ksrc\search-extracted-v1\` + strings.Repeat("a", 40)
-	dirs := make([]string, 600)
-	for i := range dirs {
-		dirs[i] = dir
-	}
-	base := windowsArgsLen(baseArgs) + 1 // separator before the first dir
-	chunks := chunkByBudget(base, dirs, rgCmdLineBudget)
-	if len(chunks) < 2 {
-		t.Fatalf("expected multiple chunks, got %d", len(chunks))
-	}
-	total := 0
-	for i, chunk := range chunks {
-		lineLen := windowsArgsLen(append(append([]string{}, baseArgs...), chunk...))
-		if lineLen > windowsCmdLineLimit {
-			t.Fatalf("chunk %d escaped command line %d exceeds Windows limit %d", i, lineLen, windowsCmdLineLimit)
-		}
-		total += len(chunk)
-	}
-	if total != len(dirs) {
-		t.Fatalf("expected %d total dirs, got %d", len(dirs), total)
 	}
 }

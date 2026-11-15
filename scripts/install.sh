@@ -170,6 +170,9 @@ esac
 
 mkdir -p "$bin_dir"
 target="$bin_dir/ksrc"
+if [ "$os" = "windows" ]; then
+  target="${target}.exe"
+fi
 if [ -e "$target" ]; then
   if [ -d "$target" ]; then
     echo "Refusing to overwrite directory $target" >&2

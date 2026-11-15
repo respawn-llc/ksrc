@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -102,7 +103,7 @@ func TestLoadPlatformPrefersFullSourcesAndFallsBackToStubs(t *testing.T) {
 func TestFindAndroidSDKExplicitAndEnv(t *testing.T) {
 	sdk := t.TempDir()
 	project := t.TempDir()
-	if err := os.WriteFile(filepath.Join(project, "local.properties"), []byte("sdk.dir="+sdk+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, "local.properties"), []byte("sdk.dir="+propertyPath(sdk)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	other := t.TempDir()
@@ -130,34 +131,43 @@ func TestFindAndroidSDKExplicitAndEnv(t *testing.T) {
 	}
 }
 
-func TestReadPropertiesValueTrimsAndUnescapes(t *testing.T) {
+func TestReadPropertiesSyntax(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "local.properties")
 	body := "# comment\r\n\n" +
 		"sdk.dir = /opt/android\n" +
 		"win.dir=C\\:\\\\Users\\\\me\\\\sdk\n" +
-		"other.dir:/opt/other\n"
+		"other.dir:/opt/other\n" +
+		`unicode.dir=C\:\\Users\\\u041d\u0438\u043a\u0438\u0442\u0430\\sdk` + "\n" +
+		"duplicate=first\nduplicate=last\n" +
+		"continued=/opt/an\\\n    droid\n" +
+		"space.dir /opt/space\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, ok := readPropertiesValue(path, "sdk.dir")
-	if !ok || got != "/opt/android" {
-		t.Fatalf("spaced sdk.dir = %q ok=%v", got, ok)
+	props, err := readProperties(path)
+	if err != nil {
+		t.Fatal(err)
 	}
-	got, ok = readPropertiesValue(path, "win.dir")
-	if !ok || got != `C:\Users\me\sdk` {
-		t.Fatalf("escaped win.dir = %q ok=%v", got, ok)
-	}
-	got, ok = readPropertiesValue(path, "other.dir")
-	if !ok || got != "/opt/other" {
-		t.Fatalf("colon other.dir = %q ok=%v", got, ok)
+	for key, want := range map[string]string{
+		"sdk.dir":     "/opt/android",
+		"win.dir":     `C:\Users\me\sdk`,
+		"other.dir":   "/opt/other",
+		"unicode.dir": `C:\Users\Никита\sdk`,
+		"duplicate":   "last",
+		"continued":   "/opt/android",
+		"space.dir":   "/opt/space",
+	} {
+		if got, ok := props.Get(key); !ok || got != want {
+			t.Errorf("%s = %q, %v; want %q", key, got, ok, want)
+		}
 	}
 }
 
 func TestFindAndroidSDKAcceptsSpacedSDKDir(t *testing.T) {
 	sdk := t.TempDir()
 	project := t.TempDir()
-	if err := os.WriteFile(filepath.Join(project, "local.properties"), []byte("sdk.dir = "+sdk+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, "local.properties"), []byte("sdk.dir = "+propertyPath(sdk)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("ANDROID_HOME", "")
@@ -176,7 +186,7 @@ func TestFindAndroidSDKIgnoresParentLocalProperties(t *testing.T) {
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(parent, "local.properties"), []byte("sdk.dir="+parentSDK+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(parent, "local.properties"), []byte("sdk.dir="+propertyPath(parentSDK)+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("ANDROID_HOME", projectSDK)
@@ -185,6 +195,94 @@ func TestFindAndroidSDKIgnoresParentLocalProperties(t *testing.T) {
 	if err != nil || got != projectSDK {
 		t.Fatalf("parent local.properties leaked: got %q err=%v", got, err)
 	}
+}
+
+func TestFindAndroidSDKRelativeInvocationPaths(t *testing.T) {
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	sdk := filepath.Join(cwd, "sdk")
+	project := filepath.Join(cwd, "project")
+	for _, dir := range []string{sdk, project} {
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, source := range []string{"explicit", "ANDROID_HOME", "ANDROID_SDK_ROOT"} {
+		t.Run(source, func(t *testing.T) {
+			t.Setenv("ANDROID_HOME", "")
+			t.Setenv("ANDROID_SDK_ROOT", "")
+			explicit := ""
+			if source == "explicit" {
+				explicit = "sdk"
+			} else {
+				t.Setenv(source, "sdk")
+			}
+			got, err := FindAndroidSDK(explicit, project)
+			if err != nil || got != sdk {
+				t.Fatalf("SDK = %q err=%v, want %q", got, err, sdk)
+			}
+		})
+	}
+}
+
+func TestFindAndroidSDKLocalPropertiesSemantics(t *testing.T) {
+	for _, tc := range []struct {
+		body string
+		sdk  string
+	}{
+		{"sdk.dir=missing\nsdk.dir=sdk\n", "sdk"},
+		{"sdk.dir=s\\\n  dk\n", "sdk"},
+		{"sdk.dir=missing\nandroid.dir=sdk\n", "sdk"},
+		{"sdk.dir=sdk\nandroid.dir=other\n", "sdk"},
+		{"sdk.dir=\\u0441dk\n", "сdk"},
+		{"sdk.dir=${KSRC_LITERAL_SDK}\n", "${KSRC_LITERAL_SDK}"},
+	} {
+		t.Run(tc.body, func(t *testing.T) {
+			project := t.TempDir()
+			sdk := filepath.Join(project, tc.sdk)
+			if err := os.Mkdir(sdk, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			writePlatformFile(t, filepath.Join(project, "local.properties"), tc.body)
+			t.Setenv("ANDROID_HOME", t.TempDir())
+			t.Setenv("ANDROID_SDK_ROOT", "")
+			t.Setenv("KSRC_LITERAL_SDK", "missing")
+			got, err := FindAndroidSDK("", project)
+			if err != nil || got != sdk {
+				t.Fatalf("SDK = %q err=%v, want %q", got, err, sdk)
+			}
+		})
+	}
+}
+
+func TestFindAndroidSDKReportsPropertiesErrors(t *testing.T) {
+	for _, kind := range []string{"malformed", "unreadable"} {
+		t.Run(kind, func(t *testing.T) {
+			project := filepath.Join(t.TempDir(), `with\backslash`)
+			if err := os.MkdirAll(project, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(project, "local.properties")
+			if kind == "malformed" {
+				writePlatformFile(t, path, `sdk.dir=\uZZZZ`)
+			} else if err := os.Mkdir(path, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("ANDROID_HOME", t.TempDir())
+			_, err := FindAndroidSDK("", project)
+			if err == nil || !strings.Contains(err.Error(), strconv.Quote(path)) {
+				t.Fatalf("expected diagnostic for %s, got %v", path, err)
+			}
+			explicit := t.TempDir()
+			if got, err := FindAndroidSDK(explicit, project); err != nil || got != explicit {
+				t.Fatalf("explicit override = %q err=%v, want %q", got, err, explicit)
+			}
+		})
+	}
+}
+
+func propertyPath(path string) string {
+	return strings.NewReplacer(`\`, `\\`, `:`, `\:`).Replace(path)
 }
 
 func writePlatformFile(t *testing.T, path, body string) {

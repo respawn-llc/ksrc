@@ -1,12 +1,56 @@
 package adapter
 
 import (
+	"errors"
+	"io"
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
-	"github.com/respawn-app/ksrc/internal/search"
+	"github.com/respawn-llc/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/search"
 )
+
+func TestWriteSourceText(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		data     string
+		start    int
+		numbered bool
+		want     string
+	}{
+		{"raw", "one\r\n\ntwo", 1, false, "one\r\n\ntwo"},
+		{"numbered", "one\n\nthree\n", 1, true, "1: one\n2: \n3: three\n"},
+		{"range", "ten\neleven", 10, true, "10: ten\n11: eleven"},
+		{"CRLF", "one\r\ntwo\r\n", 1, true, "1: one\r\n2: two\r\n"},
+		{"empty", "", 1, true, ""},
+		{"long line", strings.Repeat("x", 100000), 2, true, "2: " + strings.Repeat("x", 100000)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out strings.Builder
+			if err := WriteSourceText(&out, []byte(tc.data), tc.start, tc.numbered); err != nil {
+				t.Fatal(err)
+			}
+			if out.String() != tc.want {
+				t.Fatalf("output = %q; want %q", out.String(), tc.want)
+			}
+		})
+	}
+}
+
+type sourceTextErrorWriter struct{}
+
+func (sourceTextErrorWriter) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func TestWriteSourceTextReportsOutputFailure(t *testing.T) {
+	for _, numbered := range []bool{false, true} {
+		err := WriteSourceText(sourceTextErrorWriter{}, []byte("source\n"), 1, numbered)
+		if !errors.Is(err, io.ErrClosedPipe) {
+			t.Fatalf("numbered=%v: missing output error: %v", numbered, err)
+		}
+	}
+}
 
 func TestWriteDepsOutputDeduplicatesAndFallsBackToSources(t *testing.T) {
 	var sb strings.Builder

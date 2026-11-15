@@ -4,27 +4,27 @@ plugins {
 }
 
 val androidCompileSdk = libs.versions.androidCompileSdk.get().toInt()
+val androidCompileSdkMinor = libs.versions.androidCompileSdkMinor.get().toInt()
 val androidMinSdk = libs.versions.androidMinSdk.get().toInt()
 
 kotlin {
     android {
         namespace = "com.example.ksrcsample"
-        compileSdk = androidCompileSdk
+        compileSdk {
+            version = release(androidCompileSdk) {
+                minorApiLevel = androidCompileSdkMinor
+            }
+        }
         minSdk = androidMinSdk
     }
     jvm("desktop")
 
     sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(libs.kotlinx.datetime)
-            }
+        commonMain.dependencies {
+            implementation(libs.kotlinx.datetime)
         }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-            }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
-        val desktopMain by getting
     }
 }

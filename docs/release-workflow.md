@@ -6,6 +6,7 @@ This document describes how a release is cut, what must be bumped, and what auto
 
 - Version source: `VERSION`
 - Claude plugin version: `.claude-plugin/plugin.json`
+- Codex plugin version: `plugin.json`
 - Release workflow: `.github/workflows/release.yml`
 - Tap update script: `scripts/update-brew-tap.sh`
 - Homebrew tap repo (separate): `../homebrew-tap` or https://github.com/respawn-llc/homebrew-tap.
@@ -18,7 +19,7 @@ This document describes how a release is cut, what must be bumped, and what auto
 
 1. `VERSION`
    - This becomes the tag `vX.Y.Z` and the CLI version.
-2. `.claude-plugin/plugin.json`
+2. `.claude-plugin/plugin.json` and `plugin.json`
    - Keep plugin version aligned with the release version.
 
 Optional (as needed):
@@ -31,7 +32,7 @@ Trigger the workflow:
 
 What it does:
 1. Reads `VERSION` and computes the tag `vX.Y.Z`.
-2. If `vX.Y.Z` already exists, bumps the patch version to the next unused tag, updates `VERSION` and `.claude-plugin/plugin.json`, commits the bump, and pushes it with `OPENSOURCE_PAT`.
+2. If `vX.Y.Z` already exists, bumps the patch version to the next unused tag, updates `VERSION`, `.claude-plugin/plugin.json`, and `plugin.json`, commits the bump, and pushes it with `OPENSOURCE_PAT`.
 3. Creates the git tag and pushes it. The workflow fails if the selected tag already exists at this point.
 4. Builds release binaries for all OS/arch pairs and uploads them to a draft GitHub release.
 5. Updates the Homebrew tap by opening a PR in `respawn-llc/homebrew-tap`:

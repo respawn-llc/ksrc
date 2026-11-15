@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/respawn-app/ksrc/internal/cli"
+	"github.com/respawn-llc/ksrc/internal/cli"
 )
 
 func main() {

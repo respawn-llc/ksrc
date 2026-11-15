@@ -2,10 +2,11 @@ package adapter
 
 import (
 	"os"
+	"path/filepath"
 
-	"github.com/respawn-app/ksrc/internal/fileidcache"
-	"github.com/respawn-app/ksrc/internal/resolve"
-	"github.com/respawn-app/ksrc/internal/search"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
+	"github.com/respawn-llc/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/search"
 )
 
 func TrackSearchMatches(matches []search.Match) error {
@@ -53,11 +54,25 @@ func FindFollowupFileIDLocationWithOptions(fileID string, opts resolve.CacheOpti
 	}
 	jarPath, found, err := fileidcache.Lookup(fileID)
 	if found {
-		return FileLocation{
-			Source:    resolve.SourceJar{Coord: coord, Path: jarPath},
-			InnerPath: inner,
-			FileID:    resolve.FormatFileID(coord, inner),
-		}, true, nil
+		source := resolve.SourceJar{Coord: coord, Path: jarPath}
+		var warnings []string
+		if resolve.IsPlatformCoord(coord) {
+			loaded, err := reselectCachedPlatformSource(coord, jarPath)
+			if err != nil || len(loaded.Sources) == 0 {
+				return FileLocation{}, false, err
+			}
+			source, warnings = loaded.Sources[0], loaded.Warnings
+		} else if _, statErr := os.Stat(jarPath); statErr != nil {
+			found = false
+		}
+		if found {
+			return FileLocation{
+				Source:    source,
+				InnerPath: inner,
+				FileID:    resolve.FormatFileID(source.Coord, inner),
+				Warnings:  warnings,
+			}, true, nil
+		}
 	}
 	if err != nil {
 		// File-id cache is best-effort. Read failures should degrade to cache miss so
@@ -73,6 +88,26 @@ func FindFollowupFileIDLocationWithOptions(fileID string, opts resolve.CacheOpti
 		InnerPath: inner,
 		FileID:    resolve.FormatFileID(source.Coord, inner),
 	}, true, nil
+}
+
+func reselectCachedPlatformSource(coord resolve.Coord, path string) (resolve.PlatformLoad, error) {
+	id, err := resolve.NormalizePlatformID(coord.Version)
+	if err != nil {
+		return resolve.PlatformLoad{}, err
+	}
+	path = filepath.Clean(path)
+	root := filepath.Dir(filepath.Dir(path))
+	if filepath.Base(path) == "android-stubs-src.jar" {
+		root = filepath.Dir(root)
+		if path != filepath.Join(root, "platforms", id, "android-stubs-src.jar") {
+			return resolve.PlatformLoad{}, nil
+		}
+	} else if path != filepath.Join(root, "sources", id) {
+		return resolve.PlatformLoad{}, nil
+	}
+	// The cached location identifies the SDK without rediscovery, but LoadPlatform
+	// remains authoritative when full sources are installed after a stub search.
+	return resolve.LoadPlatform(root, id)
 }
 
 func FindCachedCoordSource(coord resolve.Coord) (resolve.SourceJar, bool, error) {

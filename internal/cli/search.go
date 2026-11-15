@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/search"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/search"
 	"github.com/spf13/cobra"
 )
 

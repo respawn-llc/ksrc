@@ -16,12 +16,15 @@ type Runner interface {
 type OSRunner struct{}
 
 func (OSRunner) Run(ctx context.Context, dir string, name string, args ...string) (string, string, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd, err := command(ctx, name, args...)
+	if err != nil {
+		return "", "", err
+	}
 	cmd.Dir = dir
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf
-	err := cmd.Run()
+	err = cmd.Run()
 	return outBuf.String(), errBuf.String(), err
 }
 

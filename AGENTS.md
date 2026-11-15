@@ -1,6 +1,6 @@
 ## Context
 `ksrc` is a Go CLI for searching and reading Kotlin/Java dependency sources resolved from Gradle projects.
-It resolves dependencies via Gradle, ensures `-sources.jar` artifacts exist in Gradle caches, then uses `rg` for search and zip reads for `cat/open`.
+It resolves dependencies via Gradle, ensures `-sources.jar` artifacts exist in Gradle caches, then uses `rg` for search and zip reads for `cat`.
 The tool is designed for scriptable/agent workflows: stable output, file-id chaining, and zero mutation of the target project.
 
 Primary docs to keep aligned with code:
@@ -77,6 +77,7 @@ go test -cover ./...
 ## Dev environment tips
 - Build output version is injected from `VERSION` via ldflags; without that, CLI reports `dev`.
 - Keep `./bin/ksrc` current if your local shell/tooling points to it.
+- Keep `.claude-plugin/plugin.json` and `plugin.json` versions aligned with `VERSION`. The Codex marketplace is `.agents/plugins/marketplace.json`. Both plugins share `skills/ksrc/SKILL.md`.
 
 ## Architecture Notes
 - Keep command wiring thin in `internal/cli` and `internal/mcpserver`; keep shared source-tool behavior in `internal/adapter` and domain behavior in `resolution`, `gradle`, `resolve`, `search`, and `cat`.
@@ -89,7 +90,7 @@ go test -cover ./...
 - Search output and file-id contract are API surfaces; keep formats stable and parseable:
   - Search: `<file-id> <line>:<col>:<match>`
   - File-id: `group:artifact:version!/path/inside/jar.ext`
-  - Android SDK platform sources use `sdk.android:platform:<platformId>!/path`, for example `sdk.android:platform:android-36!/android/app/Activity.java`. The caller passes the platform id. `--android-home` / MCP `androidHome` overrides SDK lookup (`local.properties` `sdk.dir`, then `android.dir`, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`). This coordinate does not go through Gradle.
+  - Android platform source selectors and SDK lookup follow [the CLI API reference](docs/cli-api.md#android-sdk-sources).
 - MCP tools are plaintext-first; keep tool outputs in `content` and avoid introducing structured payload dependencies.
 
 ## Code style

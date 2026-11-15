@@ -1,6 +1,6 @@
 package resolution
 
-import "github.com/respawn-app/ksrc/internal/resolve"
+import "github.com/respawn-llc/ksrc/internal/resolve"
 
 type mergedAttemptResults struct {
 	Sources []resolve.SourceJar

@@ -3,6 +3,7 @@ package cat
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -44,5 +45,64 @@ func TestReadSourceFileFromDirectory(t *testing.T) {
 	}
 	if strings.Contains(string(got), "Stub!") {
 		t.Fatal("unexpected stub text")
+	}
+}
+
+func TestDirectorySourceRejectsEscapingSymlinks(t *testing.T) {
+	for _, directoryLink := range []bool{false, true} {
+		t.Run(map[bool]string{false: "file", true: "directory"}[directoryLink], func(t *testing.T) {
+			root, outside := t.TempDir(), t.TempDir()
+			secret := filepath.Join(outside, "Secret.java")
+			if err := os.WriteFile(secret, []byte("outside source root"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			target, inner := secret, "link"
+			if directoryLink {
+				target, inner = outside, "link/Secret.java"
+			}
+			makeSourceSymlink(t, target, filepath.Join(root, "link"))
+			if ok, err := HasSourceFile(root, inner); err == nil || ok {
+				t.Fatalf("escaping link accepted: ok=%v err=%v", ok, err)
+			}
+			if content, err := ReadSourceFile(root, inner, nil); err == nil {
+				t.Fatalf("read escaped source tree: %q", content)
+			}
+		})
+	}
+}
+
+func TestDirectorySourceRechecksSymlinkOnRead(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "Inside.java"), []byte("inside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	makeSourceSymlink(t, "Inside.java", link)
+	if ok, err := HasSourceFile(root, "link"); err != nil || !ok {
+		t.Fatalf("internal link rejected: ok=%v err=%v", ok, err)
+	}
+	if content, err := ReadSourceFile(root, "link", nil); err != nil || string(content) != "inside" {
+		t.Fatalf("internal link unreadable: %q err=%v", content, err)
+	}
+	outside := filepath.Join(t.TempDir(), "Outside.java")
+	if err := os.WriteFile(outside, []byte("outside"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	makeSourceSymlink(t, outside, link)
+	if content, err := ReadSourceFile(root, "link", nil); err == nil {
+		t.Fatalf("changed link escaped source tree: %q", content)
+	}
+}
+
+func makeSourceSymlink(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("Windows symlink creation unavailable: %v", err)
+		}
+		t.Fatal(err)
 	}
 }

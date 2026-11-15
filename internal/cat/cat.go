@@ -65,11 +65,16 @@ func HasSourceFile(root, innerPath string) (bool, error) {
 	if !info.IsDir() {
 		return HasFileInZip(root, innerPath)
 	}
-	full, err := sourceFilePath(root, innerPath)
+	name, err := sourceRelativePath(innerPath)
 	if err != nil {
 		return false, err
 	}
-	fileInfo, err := os.Stat(full)
+	tree, err := os.OpenRoot(root)
+	if err != nil {
+		return false, err
+	}
+	defer tree.Close()
+	fileInfo, err := tree.Stat(name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -88,11 +93,16 @@ func ReadSourceFile(root, innerPath string, lr *LineRange) ([]byte, error) {
 	if !info.IsDir() {
 		return ReadFileFromZip(root, innerPath, lr)
 	}
-	full, err := sourceFilePath(root, innerPath)
+	name, err := sourceRelativePath(innerPath)
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.Open(full)
+	tree, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	defer tree.Close()
+	file, err := tree.Open(name)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("file not found in source root: %s", normalizeArchivePath(innerPath))
@@ -106,7 +116,7 @@ func ReadSourceFile(root, innerPath string, lr *LineRange) ([]byte, error) {
 	return readRange(file, lr)
 }
 
-func sourceFilePath(root, innerPath string) (string, error) {
+func sourceRelativePath(innerPath string) (string, error) {
 	innerPath = normalizeArchivePath(innerPath)
 	if innerPath == "" {
 		return "", fmt.Errorf("invalid source path: %q", innerPath)
@@ -116,12 +126,7 @@ func sourceFilePath(root, innerPath string) (string, error) {
 			return "", fmt.Errorf("invalid source path: %s", innerPath)
 		}
 	}
-	full := filepath.Join(root, filepath.FromSlash(innerPath))
-	rel, err := filepath.Rel(root, full)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("invalid source path: %s", innerPath)
-	}
-	return full, nil
+	return filepath.FromSlash(innerPath), nil
 }
 
 // HasFileInZip reports whether a zip/jar contains the requested inner path.

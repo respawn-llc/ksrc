@@ -3,6 +3,7 @@ package search
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -41,6 +42,9 @@ func TestSearchExtractCacheRootFallsBackToTempDirWhenUserCacheDirFails(t *testin
 }
 
 func TestPrepareExtractCacheRootFallsBackToTempDirWhenConfiguredParentIsUnwritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory access uses ACLs, not chmod write bits")
+	}
 	blockedParent := filepath.Join(t.TempDir(), "blocked")
 	if err := os.MkdirAll(blockedParent, 0o755); err != nil {
 		t.Fatalf("mkdir blocked parent: %v", err)
@@ -63,6 +67,9 @@ func TestPrepareExtractCacheRootFallsBackToTempDirWhenConfiguredParentIsUnwritab
 }
 
 func TestPrepareExtractCacheRootFallsBackToTempDirWhenConfiguredRootIsUnwritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows directory access uses ACLs, not chmod write bits")
+	}
 	blockedRoot := filepath.Join(t.TempDir(), "cache")
 	if err := os.MkdirAll(blockedRoot, 0o755); err != nil {
 		t.Fatalf("mkdir blocked root: %v", err)
@@ -81,5 +88,27 @@ func TestPrepareExtractCacheRootFallsBackToTempDirWhenConfiguredRootIsUnwritable
 	}
 	if root != tempExtractCacheRoot() {
 		t.Fatalf("expected temp fallback root, got %q", root)
+	}
+}
+
+func TestPrepareExtractCacheRootFallsBackWhenPathIsBlocked(t *testing.T) {
+	for _, blockParent := range []bool{false, true} {
+		t.Run(map[bool]string{false: "root", true: "parent"}[blockParent], func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "blocked")
+			if err := os.WriteFile(path, []byte("not a directory"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if blockParent {
+				path = filepath.Join(path, "cache")
+			}
+			t.Setenv(extractCacheDirEnv, path)
+			root, err := prepareExtractCacheRoot()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if root != tempExtractCacheRoot() {
+				t.Fatalf("expected fallback root, got %q", root)
+			}
+		})
 	}
 }

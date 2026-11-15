@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/executil"
-	"github.com/respawn-app/ksrc/internal/resolution"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type Resolver struct {

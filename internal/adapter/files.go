@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 type FileLocation struct {
 	Source    resolve.SourceJar
 	InnerPath string
 	FileID    string
+	Warnings  []string
 }
 
 func ResolveCoordSource(sources []resolve.SourceJar, coord resolve.Coord, missingHint string) (resolve.SourceJar, error) {

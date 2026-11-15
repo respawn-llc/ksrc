@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolution"
 )
 
 type failingRunner struct {

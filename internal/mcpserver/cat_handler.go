@@ -3,12 +3,13 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/cat"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/cat"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -37,6 +38,7 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 		}
 	}
 	if found {
+		adapter.WriteWarnings(os.Stderr, location.Warnings)
 		data, err := cat.ReadSourceFile(location.Source.Path, location.InnerPath, lr)
 		if err != nil {
 			return toolError(err), nil

@@ -1,6 +1,6 @@
 package resolve
 
-import "github.com/respawn-app/ksrc/internal/cat"
+import "github.com/respawn-llc/ksrc/internal/cat"
 
 // FindFileInSources locates an inner path in resolved source jars.
 func FindFileInSources(sources []SourceJar, inner string) (SourceJar, string, bool) {

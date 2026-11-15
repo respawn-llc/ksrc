@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/respawn-app/ksrc/scripts/internal/depupdate"
+	"github.com/respawn-llc/ksrc/scripts/internal/depupdate"
 )
 
 func main() {

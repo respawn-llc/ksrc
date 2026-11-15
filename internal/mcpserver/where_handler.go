@@ -3,11 +3,12 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -30,6 +31,7 @@ func (s *toolState) handleWhere(ctx context.Context, call *mcp.CallToolRequest) 
 			}
 		}
 		if found {
+			adapter.WriteWarnings(os.Stderr, location.Warnings)
 			return builderResult(func(sb *strings.Builder) error {
 				return adapter.WriteFileLocation(sb, location)
 			})

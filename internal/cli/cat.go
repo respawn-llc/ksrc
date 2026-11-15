@@ -5,20 +5,22 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/cat"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/cat"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
 
 func newCatCmd(app *App) *cobra.Command {
 	var flags ResolveFlags
 	var lines string
+	var lineNumbers bool
 
 	cmd := &cobra.Command{
-		Use:   "cat <file-id|path>",
-		Short: "Print file contents from dependency sources",
-		Args:  cobra.ExactArgs(1),
+		Use:     "cat <file-id|path>",
+		Aliases: []string{"open"},
+		Short:   "Print file contents from dependency sources",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			arg := strings.TrimSpace(args[0])
 			lr, err := cat.ParseLineRange(lines)
@@ -26,8 +28,8 @@ func newCatCmd(app *App) *cobra.Command {
 				return err
 			}
 
+			location := adapter.FileLocation{}
 			if strings.Contains(arg, "!/") {
-				location := adapter.FileLocation{}
 				found := false
 				if !hasExplicitFollowupResolutionContext(cmd) {
 					var err error
@@ -58,36 +60,33 @@ func newCatCmd(app *App) *cobra.Command {
 					}
 					adapter.TryTrackFileLocation(location)
 				}
-				data, err := cat.ReadSourceFile(location.Source.Path, location.InnerPath, lr)
+			} else {
+				if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
+					return fmt.Errorf("path requires --module, or --group plus --artifact, or a file-id. Try: ksrc cat <file-id> or ksrc cat --module group:artifact[:version] <path>")
+				}
+				sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
 				if err != nil {
 					return err
 				}
-				_, err = cmd.OutOrStdout().Write(data)
-				return err
+				emitDiagnostics(cmd, meta, app.Verbose)
+				if len(sources) == 0 {
+					return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
+				}
+				location, err = adapter.ResolvePathLocation(sources, arg, "Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id")
+				if err != nil {
+					return err
+				}
 			}
-
-			if flags.Module == "" && flags.Group == "" && flags.Artifact == "" {
-				return fmt.Errorf("path requires --module, or --group plus --artifact, or a file-id. Try: ksrc cat <file-id> or ksrc cat --module group:artifact[:version] <path>")
-			}
-
-			sources, _, meta, err := resolveSources(context.Background(), app, flags, "", true, true)
-			if err != nil {
-				return err
-			}
-			emitDiagnostics(cmd, meta, app.Verbose)
-			if len(sources) == 0 {
-				return noSourcesErr(flags, noSourcesHintForFlags(flags, meta))
-			}
-			location, err := adapter.ResolvePathLocation(sources, arg, "Try: ksrc search \"<pattern>\" --module group:artifact to get a file-id")
-			if err != nil {
-				return err
-			}
+			adapter.WriteWarnings(cmd.ErrOrStderr(), location.Warnings)
 			data, err := cat.ReadSourceFile(location.Source.Path, location.InnerPath, lr)
 			if err != nil {
 				return err
 			}
-			_, err = cmd.OutOrStdout().Write(data)
-			return err
+			firstLine := 1
+			if lr != nil {
+				firstLine = lr.Start
+			}
+			return adapter.WriteSourceText(cmd.OutOrStdout(), data, firstLine, lineNumbers)
 		},
 	}
 
@@ -108,6 +107,7 @@ func newCatCmd(app *App) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.IncludeBuildscript, "buildscript", true, "include buildscript classpath dependencies (set --buildscript=false to disable)")
 	cmd.Flags().BoolVar(&flags.IncludeIncludedBuilds, "include-builds", true, "include composite builds (includeBuild) (set --include-builds=false to disable)")
 	cmd.Flags().StringVar(&lines, "lines", "", "line range (start,end | start:end | start-end | start..end | start;end)")
+	cmd.Flags().BoolVarP(&lineNumbers, "line-numbers", "n", false, "prefix output with original source line numbers")
 
 	return cmd
 }

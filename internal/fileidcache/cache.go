@@ -8,11 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-)
 
-const (
-	cacheDirEnv   = "KSRC_FILEID_CACHE_DIR"
-	cacheRootName = "ksrc/file-id-locations-v1"
+	"github.com/respawn-llc/ksrc/internal/cache"
 )
 
 type entry struct {
@@ -79,24 +76,15 @@ func Lookup(fileID string) (string, bool, error) {
 	if stored.FileID != fileID || strings.TrimSpace(stored.JarPath) == "" {
 		return "", false, nil
 	}
-	if _, err := os.Stat(stored.JarPath); err != nil {
-		if os.IsNotExist(err) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
 	return stored.JarPath, true, nil
 }
 
 func cacheRoot() (string, error) {
-	if path := strings.TrimSpace(os.Getenv(cacheDirEnv)); path != "" {
-		return path, nil
-	}
-	root, err := os.UserCacheDir()
+	root, err := cache.FileIDRoot()
 	if err != nil {
 		return "", fmt.Errorf("resolve file-id cache dir: %w", err)
 	}
-	return filepath.Join(root, cacheRootName), nil
+	return root, nil
 }
 
 func cachePath(root string, fileID string) string {

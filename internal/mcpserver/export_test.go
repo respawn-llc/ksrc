@@ -1,9 +1,9 @@
 package mcpserver
 
 import (
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/resolution"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func BuildSearchRequestForTest(input SearchInput) resolution.Request {

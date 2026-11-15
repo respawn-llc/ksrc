@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/gradlehome"
+	"github.com/respawn-llc/ksrc/internal/gradlehome"
 )
 
 var errCachedSourcesNotFound = errors.New("sources not found in cache")

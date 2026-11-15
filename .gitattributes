@@ -1,1 +1,3 @@
 *.bat text eol=crlf
+internal/gradle/templates/** text eol=lf
+internal/gradle/testdata/** text eol=lf

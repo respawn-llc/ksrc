@@ -2,6 +2,7 @@ package cli
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -9,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/executil"
+	"github.com/respawn-llc/ksrc/internal/fileidcache"
 )
 
 type rgOnlyRunner struct {
@@ -121,7 +123,7 @@ func TestAndroidPlatformNumericVersionMatchesNormalizedRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("where coord error: %v\n%s", err, whereCoord)
 	}
-	if !strings.Contains(whereCoord, "sources/android-36") {
+	if !strings.Contains(whereCoord, filepath.Join(sdk, "sources", "android-36")) {
 		t.Fatalf("where coord = %s", whereCoord)
 	}
 
@@ -129,7 +131,7 @@ func TestAndroidPlatformNumericVersionMatchesNormalizedRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("where file-id error: %v\n%s", err, whereFile)
 	}
-	if !strings.Contains(whereFile, "sdk.android:platform:android-36!/android/app/Activity.java") || !strings.Contains(whereFile, "sources/android-36") {
+	if !strings.Contains(whereFile, "sdk.android:platform:android-36!/android/app/Activity.java") || !strings.Contains(whereFile, filepath.Join(sdk, "sources", "android-36")) {
 		t.Fatalf("where file-id = %s", whereFile)
 	}
 
@@ -137,13 +139,12 @@ func TestAndroidPlatformNumericVersionMatchesNormalizedRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fetch error: %v\n%s", err, fetchOut)
 	}
-	if !strings.Contains(fetchOut, "sdk.android:platform:android-36|") || !strings.Contains(fetchOut, "sources/android-36") {
+	if !strings.Contains(fetchOut, "sdk.android:platform:android-36|") || !strings.Contains(fetchOut, filepath.Join(sdk, "sources", "android-36")) {
 		t.Fatalf("fetch = %s", fetchOut)
 	}
 }
 
 func TestCatUsesFileIDCacheWithoutRediscoveringSDK(t *testing.T) {
-	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
 	t.Setenv("ANDROID_HOME", "")
 	t.Setenv("ANDROID_SDK_ROOT", "")
 	sdk := writeAndroidSDK(t, true)
@@ -171,6 +172,34 @@ func TestCatUsesFileIDCacheWithoutRediscoveringSDK(t *testing.T) {
 	}
 }
 
+func TestAndroidPlatformRelativeSDKWithDifferentProject(t *testing.T) {
+	t.Setenv("ANDROID_HOME", "")
+	t.Setenv("ANDROID_SDK_ROOT", "")
+	sdk := writeAndroidSDK(t, true)
+	invocation := t.TempDir()
+	project := t.TempDir()
+	t.Chdir(invocation)
+	relative, err := filepath.Rel(invocation, sdk)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp()
+	app.Runner = rgOnlyRunner{}
+	out, err := runCommand(app, []string{
+		"search", "ContextThemeWrapper", "--module", "sdk.android:platform:36",
+		"--android-home", relative, "--project", project,
+	})
+	fileID := "sdk.android:platform:android-36!/android/app/Activity.java"
+	if err != nil || !strings.Contains(out, fileID) {
+		t.Fatalf("relative SDK search failed: %v\n%s", err, out)
+	}
+	t.Chdir(project)
+	out, err = runCommand(app, []string{"cat", fileID})
+	if err != nil || !strings.Contains(out, "ContextThemeWrapper") {
+		t.Fatalf("file-id followup from another cwd failed: %v\n%s", err, out)
+	}
+}
+
 func TestAndroidPlatformRequiresVersion(t *testing.T) {
 	app := NewApp()
 	app.Runner = rgOnlyRunner{}
@@ -184,8 +213,71 @@ func TestAndroidPlatformRequiresVersion(t *testing.T) {
 	}
 }
 
+func TestCachedAndroidPlatformFollowupWarnsAfterSourcesUninstalled(t *testing.T) {
+	for _, command := range []string{"cat", "open", "where"} {
+		t.Run(command, func(t *testing.T) {
+			t.Setenv("ANDROID_HOME", "")
+			t.Setenv("ANDROID_SDK_ROOT", "")
+			sdk := writeAndroidSDK(t, true)
+			fullSources := filepath.Join(sdk, "sources", "android-36")
+			fileID := "sdk.android:platform:android-36!/android/app/Activity.java"
+			if err := fileidcache.Register(fileID, fullSources); err != nil {
+				t.Fatal(err)
+			}
+			uninstalled := filepath.Join(t.TempDir(), "android-36")
+			if err := os.Rename(fullSources, uninstalled); err != nil {
+				t.Fatal(err)
+			}
+			app := NewApp()
+			app.Runner = rgOnlyRunner{}
+			run := func() (string, string) {
+				t.Helper()
+				cmd := NewRootCommand(app)
+				cmd.SetArgs([]string{command, fileID})
+				var stdout, stderr bytes.Buffer
+				cmd.SetOut(&stdout)
+				cmd.SetErr(&stderr)
+				if err := cmd.Execute(); err != nil {
+					t.Fatalf("%s error: %v\n%s", command, err, stderr.String())
+				}
+				return stdout.String(), stderr.String()
+			}
+			out, diagnostics := run()
+			want := "Stub!"
+			if command == "where" {
+				want = filepath.Join(sdk, "platforms", "android-36", "android-stubs-src.jar")
+			}
+			if !strings.Contains(out, want) {
+				t.Errorf("missing fallback %q:\n%s", want, out)
+			}
+			if !strings.Contains(diagnostics, "WARN:") || !strings.Contains(diagnostics, "android sdk install sources/android-36") {
+				t.Errorf("missing fallback warning and install hint on stderr:\n%s", diagnostics)
+			}
+			if strings.Contains(out, "WARN:") {
+				t.Errorf("warning leaked into stdout:\n%s", out)
+			}
+
+			if err := os.Rename(uninstalled, fullSources); err != nil {
+				t.Fatal(err)
+			}
+			out, diagnostics = run()
+			want = "ContextThemeWrapper"
+			if command == "where" {
+				want = fullSources
+			}
+			if !strings.Contains(out, want) || strings.Contains(out, "Stub!") {
+				t.Errorf("reinstalled sources not selected:\n%s", out)
+			}
+			if strings.Contains(diagnostics, "WARN:") || strings.Contains(diagnostics, "android sdk install") {
+				t.Errorf("stale fallback warning after reinstall:\n%s", diagnostics)
+			}
+		})
+	}
+}
+
 func writeAndroidSDK(t *testing.T, withSources bool) string {
 	t.Helper()
+	t.Setenv("KSRC_FILEID_CACHE_DIR", t.TempDir())
 	sdk := t.TempDir()
 	if withSources {
 		path := filepath.Join(sdk, "sources", "android-36", "android", "app", "Activity.java")

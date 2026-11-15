@@ -1,6 +1,6 @@
 package cli
 
-import "github.com/respawn-app/ksrc/internal/executil"
+import "github.com/respawn-llc/ksrc/internal/executil"
 
 type App struct {
 	Runner  executil.Runner

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/adapter"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/adapter"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +30,7 @@ func newWhereCmd(app *App) *cobra.Command {
 					}
 				}
 				if found {
+					adapter.WriteWarnings(cmd.ErrOrStderr(), location.Warnings)
 					return adapter.WriteFileLocation(cmd.OutOrStdout(), location)
 				}
 				coord, _, err := resolve.ParseFileID(arg)

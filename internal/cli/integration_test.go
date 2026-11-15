@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/respawn-app/ksrc/internal/gradle"
-	"github.com/respawn-app/ksrc/internal/testutil"
+	"github.com/respawn-llc/ksrc/internal/gradle"
+	"github.com/respawn-llc/ksrc/internal/testutil"
 )
 
 func TestSearchAndCatIntegration(t *testing.T) {
@@ -718,7 +718,6 @@ func TestOpenFileIDHonorsExplicitProjectAndStaleTrackedLocation(t *testing.T) {
 
 	t.Setenv("KSRC_TEST_JAR", firstJar)
 	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
-	t.Setenv("PAGER", "cat")
 
 	whereOut, err := runCommand(app, []string{"where", inner, "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDirA})
 	if err != nil {

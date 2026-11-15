@@ -6,17 +6,15 @@ import (
 	"io"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/resolution"
-	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/respawn-llc/ksrc/internal/resolution"
+	"github.com/respawn-llc/ksrc/internal/resolve"
 )
 
 func WriteDiagnostics(w io.Writer, meta resolution.ResolveMeta, verbose bool) {
 	if w == nil {
 		return
 	}
-	for _, warning := range meta.Warnings {
-		fmt.Fprintf(w, "WARN: %s\n", warning)
-	}
+	WriteWarnings(w, meta.Warnings)
 	if !verbose {
 		return
 	}
@@ -26,6 +24,15 @@ func WriteDiagnostics(w io.Writer, meta resolution.ResolveMeta, verbose bool) {
 			continue
 		}
 		fmt.Fprintf(w, "VERBOSE: %s\n", line)
+	}
+}
+
+func WriteWarnings(w io.Writer, warnings []string) {
+	if w == nil {
+		return
+	}
+	for _, warning := range warnings {
+		fmt.Fprintf(w, "WARN: %s\n", warning)
 	}
 }
 

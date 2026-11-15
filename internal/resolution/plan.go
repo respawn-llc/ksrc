@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/respawn-app/ksrc/internal/gradle"
+	"github.com/respawn-llc/ksrc/internal/gradle"
 )
 
 type resolutionPlan struct {
