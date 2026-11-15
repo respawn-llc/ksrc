@@ -12,6 +12,7 @@ type FileLocation struct {
 	Source    resolve.SourceJar
 	InnerPath string
 	FileID    string
+	Warnings  []string
 }
 
 func ResolveCoordSource(sources []resolve.SourceJar, coord resolve.Coord, missingHint string) (resolve.SourceJar, error) {

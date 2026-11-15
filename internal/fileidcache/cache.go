@@ -79,12 +79,6 @@ func Lookup(fileID string) (string, bool, error) {
 	if stored.FileID != fileID || strings.TrimSpace(stored.JarPath) == "" {
 		return "", false, nil
 	}
-	if _, err := os.Stat(stored.JarPath); err != nil {
-		if os.IsNotExist(err) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
 	return stored.JarPath, true, nil
 }
 

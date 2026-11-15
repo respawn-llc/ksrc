@@ -59,6 +59,7 @@ func newOpenCmd(app *App) *cobra.Command {
 					}
 					adapter.TryTrackFileLocation(location)
 				}
+				adapter.WriteWarnings(cmd.ErrOrStderr(), location.Warnings)
 				data, err = cat.ReadSourceFile(location.Source.Path, location.InnerPath, lr)
 				if err != nil {
 					return err
