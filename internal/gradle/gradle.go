@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/respawn-app/ksrc/internal/executil"
@@ -365,8 +366,8 @@ func formatGradleInvocation(cmd string, args []string, projectDir string, projec
 }
 
 func findGradle(runner executil.Runner, projectDir string, rootDir string) (string, error) {
-	if wrapper := localWrapperPath(projectDir); wrapper != "" {
-		return "./gradlew", nil
+	if localWrapperPath(projectDir) != "" {
+		return LocalWrapperCommand(), nil
 	}
 	if rootDir != "" && !samePath(projectDir, rootDir) {
 		if wrapper := localWrapperPath(rootDir); wrapper != "" {
@@ -377,19 +378,40 @@ func findGradle(runner executil.Runner, projectDir string, rootDir string) (stri
 	if err == nil && path != "" {
 		return "gradle", nil
 	}
-	return "", fmt.Errorf("gradle not found (no ./gradlew and gradle not on PATH)")
+	return "", fmt.Errorf("gradle not found (no %s and gradle not on PATH)", LocalWrapperCommand())
 }
 
 func localWrapperPath(projectDir string) string {
-	wrapper := filepath.Join(projectDir, "gradlew")
+	wrapper := filepath.Join(projectDir, WrapperFileName())
 	if info, err := os.Stat(wrapper); err == nil && !info.IsDir() {
 		abs, err := filepath.Abs(wrapper)
-		if err == nil {
-			return abs
+		if err != nil {
+			return wrapper
 		}
-		return wrapper
+		return abs
 	}
 	return ""
+}
+
+// WrapperFileName returns the Gradle wrapper file name for the current OS.
+// Windows cannot execute the POSIX gradlew shell script, so the batch wrapper
+// is used there instead.
+func WrapperFileName() string {
+	if runtime.GOOS == "windows" {
+		return "gradlew.bat"
+	}
+	return "gradlew"
+}
+
+// LocalWrapperCommand returns the wrapper command used when the wrapper lives
+// in the project directory. Go's os/exec runs .bat/.cmd via cmd.exe, which is
+// the only way to execute the wrapper natively on Windows. The path must use
+// Windows separators because cmd.exe cannot parse POSIX-style "./" prefixes.
+func LocalWrapperCommand() string {
+	if runtime.GOOS == "windows" {
+		return `.\\gradlew.bat`
+	}
+	return "./gradlew"
 }
 
 func writeInitScript() (string, func(), error) {

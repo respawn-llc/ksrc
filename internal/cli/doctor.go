@@ -29,13 +29,13 @@ func newDoctorCmd(app *App) *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "rg: ok\n")
 			}
 
-			wrapper := filepath.Join(project, "gradlew")
+			wrapper := filepath.Join(project, gradle.WrapperFileName())
 			if info, err := os.Stat(wrapper); err == nil && !info.IsDir() {
-				fmt.Fprintf(cmd.OutOrStdout(), "gradle: ./gradlew\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "gradle: %s\n", gradle.LocalWrapperCommand())
 			} else if _, err := app.Runner.LookPath("gradle"); err == nil {
 				fmt.Fprintf(cmd.OutOrStdout(), "gradle: gradle on PATH\n")
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "gradle: not found (no ./gradlew and gradle not on PATH)\n")
+				fmt.Fprintf(cmd.OutOrStdout(), "gradle: not found (no %s and gradle not on PATH)\n", gradle.LocalWrapperCommand())
 			}
 
 			home, err := gradlehome.Resolve(userHome, project)
