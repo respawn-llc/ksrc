@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -257,7 +258,10 @@ func TestFindAndroidSDKLocalPropertiesSemantics(t *testing.T) {
 func TestFindAndroidSDKReportsPropertiesErrors(t *testing.T) {
 	for _, kind := range []string{"malformed", "unreadable"} {
 		t.Run(kind, func(t *testing.T) {
-			project := t.TempDir()
+			project := filepath.Join(t.TempDir(), `with\backslash`)
+			if err := os.MkdirAll(project, 0o755); err != nil {
+				t.Fatal(err)
+			}
 			path := filepath.Join(project, "local.properties")
 			if kind == "malformed" {
 				writePlatformFile(t, path, `sdk.dir=\uZZZZ`)
@@ -266,7 +270,7 @@ func TestFindAndroidSDKReportsPropertiesErrors(t *testing.T) {
 			}
 			t.Setenv("ANDROID_HOME", t.TempDir())
 			_, err := FindAndroidSDK("", project)
-			if err == nil || !strings.Contains(err.Error(), path) {
+			if err == nil || !strings.Contains(err.Error(), strconv.Quote(path)) {
 				t.Fatalf("expected diagnostic for %s, got %v", path, err)
 			}
 			explicit := t.TempDir()

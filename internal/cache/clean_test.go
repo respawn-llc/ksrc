@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -125,7 +126,7 @@ func TestRootsIncludeDefaultsAndOverrides(t *testing.T) {
 }
 
 func TestDeleteReportsFailuresAndContinues(t *testing.T) {
-	base := t.TempDir()
+	base := filepath.Join(t.TempDir(), `with\backslash`)
 	blocked := filepath.Join(base, "blocked-parent")
 	bad := filepath.Join(blocked, "cache")
 	if err := os.MkdirAll(bad, 0o700); err != nil {
@@ -145,7 +146,7 @@ func TestDeleteReportsFailuresAndContinues(t *testing.T) {
 	}
 	writeCacheFile(t, blocked, "keep")
 	err = Delete(context.Background(), folders)
-	if err == nil || !strings.Contains(err.Error(), bad) {
+	if err == nil || !strings.Contains(err.Error(), strconv.Quote(bad)) {
 		t.Fatalf("missing failed path: %v", err)
 	}
 	if _, err := os.Stat(good); !os.IsNotExist(err) {
