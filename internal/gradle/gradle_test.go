@@ -26,7 +26,7 @@ func (fakeRunner) LookPath(_ string) (string, error) {
 
 func TestFindGradlePrefersLocalWrapper(t *testing.T) {
 	dir := t.TempDir()
-	wrapper := filepath.Join(dir, "gradlew")
+	wrapper := filepath.Join(dir, WrapperFileName())
 	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write wrapper: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestFindGradlePrefersLocalWrapper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("findGradle: %v", err)
 	}
-	if cmd != "./gradlew" {
+	if cmd != LocalWrapperCommand() {
 		t.Fatalf("expected local wrapper, got %q", cmd)
 	}
 }
@@ -42,7 +42,7 @@ func TestFindGradlePrefersLocalWrapper(t *testing.T) {
 func TestFindGradleFallsBackToRootWrapper(t *testing.T) {
 	root := t.TempDir()
 	included := t.TempDir()
-	wrapper := filepath.Join(root, "gradlew")
+	wrapper := filepath.Join(root, WrapperFileName())
 	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write wrapper: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestResolveNormalizesRelativeGradleUserHomeBeforeInvokingWrapper(t *testing
 			},
 		},
 	}
-	if err := os.WriteFile(filepath.Join(root, "gradlew"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(root, WrapperFileName()), []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write wrapper: %v", err)
 	}
 
