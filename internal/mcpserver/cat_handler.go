@@ -37,7 +37,7 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 		}
 	}
 	if found {
-		data, err := cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
+		data, err := cat.ReadSourceFile(location.Source.Path, location.InnerPath, lr)
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -57,7 +57,7 @@ func (s *toolState) handleCat(ctx context.Context, call *mcp.CallToolRequest) (*
 		return toolError(err), nil
 	}
 	adapter.TryTrackFileLocation(location)
-	data, err := cat.ReadFileFromZip(location.Source.Path, location.InnerPath, lr)
+	data, err := cat.ReadSourceFile(location.Source.Path, location.InnerPath, lr)
 	if err != nil {
 		return toolError(err), nil
 	}

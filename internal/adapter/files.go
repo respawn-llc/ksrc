@@ -78,5 +78,15 @@ func ResolvePathLocation(sources []resolve.SourceJar, path string, notFoundHint 
 }
 
 func sameCoord(left, right resolve.Coord) bool {
-	return left.Group == right.Group && left.Artifact == right.Artifact && left.Version == right.Version
+	if left.Group != right.Group || left.Artifact != right.Artifact {
+		return false
+	}
+	if resolve.IsPlatformCoord(left) && resolve.IsPlatformCoord(right) {
+		leftID, leftErr := resolve.NormalizePlatformID(left.Version)
+		rightID, rightErr := resolve.NormalizePlatformID(right.Version)
+		if leftErr == nil && rightErr == nil {
+			return leftID == rightID
+		}
+	}
+	return left.Version == right.Version
 }

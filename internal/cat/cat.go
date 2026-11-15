@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -52,6 +54,74 @@ var lineRangeRe = regexp.MustCompile(`^\s*(\d+)\s*(?:,|:|-|\.{2}|;|\s)\s*(\d+)\s
 func normalizeArchivePath(path string) string {
 	path = strings.ReplaceAll(path, "\\", "/")
 	return strings.TrimPrefix(path, "/")
+}
+
+// HasSourceFile reports whether root, a directory or a zip, contains innerPath.
+func HasSourceFile(root, innerPath string) (bool, error) {
+	info, err := os.Stat(root)
+	if err != nil {
+		return false, err
+	}
+	if !info.IsDir() {
+		return HasFileInZip(root, innerPath)
+	}
+	full, err := sourceFilePath(root, innerPath)
+	if err != nil {
+		return false, err
+	}
+	fileInfo, err := os.Stat(full)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return fileInfo.Mode().IsRegular(), nil
+}
+
+// ReadSourceFile reads innerPath from a directory tree or a zip/jar.
+func ReadSourceFile(root, innerPath string, lr *LineRange) ([]byte, error) {
+	info, err := os.Stat(root)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return ReadFileFromZip(root, innerPath, lr)
+	}
+	full, err := sourceFilePath(root, innerPath)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Open(full)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("file not found in source root: %s", normalizeArchivePath(innerPath))
+		}
+		return nil, err
+	}
+	defer file.Close()
+	if lr == nil {
+		return io.ReadAll(file)
+	}
+	return readRange(file, lr)
+}
+
+func sourceFilePath(root, innerPath string) (string, error) {
+	innerPath = normalizeArchivePath(innerPath)
+	if innerPath == "" {
+		return "", fmt.Errorf("invalid source path: %q", innerPath)
+	}
+	for _, part := range strings.Split(innerPath, "/") {
+		if part == ".." {
+			return "", fmt.Errorf("invalid source path: %s", innerPath)
+		}
+	}
+	full := filepath.Join(root, filepath.FromSlash(innerPath))
+	rel, err := filepath.Rel(root, full)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("invalid source path: %s", innerPath)
+	}
+	return full, nil
 }
 
 // HasFileInZip reports whether a zip/jar contains the requested inner path.
