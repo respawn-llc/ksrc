@@ -19,7 +19,7 @@ ksrc search "class Activity " --module sdk.android:platform:android-36
 ksrc cat sdk.android:platform:android-36!/android/app/Activity.java --lines 1,40
 ```
 
-Use `--android-home <path>` to select an SDK. See [Android SDK sources](https://github.com/respawn-llc/ksrc/blob/main/docs/cli-api.md#android-sdk-sources) for platform versions, SDK lookup, and installation.
+Use the installed SDK platform directory name as the version (for example, `android-36`). Use `--android-home <path>` to select an SDK, or let ksrc use the project's `local.properties` or `ANDROID_HOME` / `ANDROID_SDK_ROOT`.
 
 2. Read a file by returned id: `ksrc cat org.jetbrains.kotlinx:kotlinx-datetime:0.8.0!/kotlinx/datetime/LocalDate.kt --lines 1,200`
 

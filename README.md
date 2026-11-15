@@ -47,12 +47,13 @@ Add the Respawn marketplace, then install the plugin:
 /plugin install ksrc@respawn-tools
 ```
 
-### Codex skill
+### Codex plugin
 
-Install from the public GitHub path:
+Install the skill-only plugin:
 
-```
-$skill-installer install https://github.com/respawn-llc/ksrc/tree/main/skills/ksrc
+```bash
+codex plugin marketplace add respawn-llc/ksrc
+codex plugin add ksrc@ksrc
 ```
 
 ### MCP (Model Context Protocol)

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ksrc",
+  "description": "Ksrc CLI skill for searching/reading Kotlin dependency sources",
+  "version": "0.7.0",
+  "extensions": {
+    "com.openai": {
+      "requires_local_executor": true
+    }
+  }
+}
