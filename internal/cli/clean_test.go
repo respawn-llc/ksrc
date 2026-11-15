@@ -14,7 +14,10 @@ import (
 
 func isolateCleanCaches(t *testing.T) string {
 	t.Helper()
-	base := t.TempDir()
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("XDG_CACHE_HOME", base)
 	t.Setenv("HOME", base)
 	t.Setenv("LocalAppData", base)

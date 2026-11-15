@@ -22,17 +22,22 @@ func writeCacheFile(t *testing.T, path, body string) {
 }
 
 func TestInspectAndDelete(t *testing.T) {
-	root := t.TempDir()
-	first := filepath.Join(root, "ksrc")
-	writeCacheFile(t, filepath.Join(first, "old-version", "file"), "123")
-	writeCacheFile(t, filepath.Join(first, "current-version", "file"), "12345")
-	outside := filepath.Join(root, "gradle", "keep")
-	writeCacheFile(t, outside, "untouched")
-	folders, err := Inspect(context.Background(), []string{first, first, filepath.Join(first, "old-version"), filepath.Join(root, "absent")})
+	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(folders) != 1 || folders[0].Path != first || folders[0].Bytes != 8 {
+	first := filepath.Join(root, "ksrc")
+	writeCacheFile(t, filepath.Join(first, "old-version", "file"), "123")
+	writeCacheFile(t, filepath.Join(first, "current-version", "file"), "12345")
+	sibling := first + "-other"
+	writeCacheFile(t, filepath.Join(sibling, "file"), "123456")
+	outside := filepath.Join(root, "gradle", "keep")
+	writeCacheFile(t, outside, "untouched")
+	folders, err := Inspect(context.Background(), []string{first, first, filepath.Join(first, "old-version"), sibling, filepath.Join(root, "absent")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folders) != 2 || folders[0].Path != first || folders[0].Bytes != 8 || folders[1].Path != sibling || folders[1].Bytes != 6 {
 		t.Fatalf("folders = %+v", folders)
 	}
 	if _, err := os.Stat(first); err != nil {
@@ -126,7 +131,11 @@ func TestRootsIncludeDefaultsAndOverrides(t *testing.T) {
 }
 
 func TestDeleteReportsFailuresAndContinues(t *testing.T) {
-	base := filepath.Join(t.TempDir(), `with\backslash`)
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Join(root, `with\backslash`)
 	blocked := filepath.Join(base, "blocked-parent")
 	bad := filepath.Join(blocked, "cache")
 	if err := os.MkdirAll(bad, 0o700); err != nil {
@@ -171,7 +180,7 @@ func TestInspectRejectsSharedDirectoryThroughSymlinkedParent(t *testing.T) {
 	}
 }
 
-func TestDeleteRejectsRetargetedParentSymlink(t *testing.T) {
+func TestCleanUsesPreviewedResolvedLocation(t *testing.T) {
 	base := t.TempDir()
 	first, second := filepath.Join(base, "first"), filepath.Join(base, "second")
 	for _, parent := range []string{first, second} {
@@ -185,19 +194,27 @@ func TestDeleteRejectsRetargetedParentSymlink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	previewed, err := filepath.EvalSymlinks(filepath.Join(first, "cache"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folders) != 1 || folders[0].Path != previewed {
+		t.Fatalf("preview did not show resolved location: %+v", folders)
+	}
 	if err := os.Remove(link); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(second, link); err != nil {
 		t.Fatal(err)
 	}
-	if err := Delete(context.Background(), folders); err == nil {
-		t.Fatal("deleted through a retargeted parent")
+	if err := Delete(context.Background(), folders); err != nil {
+		t.Fatal(err)
 	}
-	for _, parent := range []string{first, second} {
-		if _, err := os.Stat(filepath.Join(parent, "cache", "keep")); err != nil {
-			t.Fatalf("deleted unconfirmed files: %v", err)
-		}
+	if _, err := os.Stat(previewed); !os.IsNotExist(err) {
+		t.Fatalf("previewed cache remains: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(second, "cache", "keep")); err != nil {
+		t.Fatalf("deleted unconfirmed files: %v", err)
 	}
 }
 
