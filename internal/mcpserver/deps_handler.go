@@ -23,6 +23,11 @@ func (s *toolState) handleDeps(ctx context.Context, call *mcp.CallToolRequest) (
 	group := strings.TrimSpace(input.Group)
 	artifact := strings.TrimSpace(input.Artifact)
 	version := strings.TrimSpace(input.Version)
+	if coord, ok, err := resolve.ExactPlatformCoord("", group, artifact, version); err != nil {
+		return toolError(err), nil
+	} else if ok {
+		version = coord.Version
+	}
 	filteredSources := resolve.FilterSources(result.Sources, "", group, artifact, version)
 	filteredDeps := resolve.FilterCoords(result.Deps, "", group, artifact, version)
 

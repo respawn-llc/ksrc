@@ -103,6 +103,15 @@ If you want faster execution & less noise, specify:
 
 For KMP modules, `--module group:artifact` searches common/base sources plus Gradle-selected platform variant source jars by default. Use `--targets` or `--config` to narrow variants.
 
+Android SDK platform sources are a coordinate, not a Gradle module. Pass the platform id you want to read:
+
+```bash
+ksrc search "class Activity " --module sdk.android:platform:android-36
+ksrc cat sdk.android:platform:android-36!/android/app/Activity.java --lines 767,790
+```
+
+`--android-home <path>` overrides the SDK directory. When it is omitted, ksrc uses `local.properties` in the project directory (`sdk.dir`, then `android.dir`), then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`. A numeric version such as `36` is normalized to `android-36`. If `sources/android-36` is installed, that directory is the only root. If only the platform stub jar is installed, search still finds the class and warns to run `android sdk install sources/android-36`.
+
 2. When you have found the desired artifact, read the file contents:
 
 ```bash

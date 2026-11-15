@@ -15,6 +15,7 @@ var followupResolutionFlags = []string{
 	"offline",
 	"refresh",
 	"gradle-user-home",
+	"android-home",
 	"buildsrc",
 	"buildscript",
 	"include-builds",

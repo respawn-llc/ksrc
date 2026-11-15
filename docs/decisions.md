@@ -78,6 +78,7 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - `rg --search-zip` cannot provide stable archive-entry provenance for `<file-id>` mapping, so search no longer uses it.
 - `internal/search` extracts source jars into a persistent cache under the user cache dir, keyed by canonical absolute jar path.
 - This intentionally models production Gradle cache behavior, where artifact paths are already checksum-addressed, and avoids extra hashing or metadata churn in the hot search path.
+- Android platform jars are not checksum-addressed. `platforms/android-<id>/*.jar` keeps the same path across SDK updates, and `source.properties` records `Pkg.Revision`. That revision is part of the extract cache key, so a newer revision is extracted again. The full `sources/android-<id>/` tree is searched in place and is not cached.
 - `KSRC_EXTRACT_CACHE_DIR` overrides the cache root for tests and local debugging.
 
 ## 2026-04-12: Cache fallback uses Maven-style version ordering
@@ -113,6 +114,13 @@ Rationale: avoid expensive Gradle runs unless needed; prioritize the most likely
 - This avoids `afterEvaluate`/`taskGraph.whenReady` resolution and keeps dependency resolution lazy enough for Configuration Cache storage/replay while preserving existing detached `classifier: sources` behavior.
 - The rendered init script is written to a stable user-cache path keyed by template version and content hash, avoiding random temp init-script paths.
 - Tradeoff: the provider still performs project-local dependency introspection when Gradle calculates task input values on a cache miss. Repeated runs can reuse Configuration Cache and replay the stored records.
+
+## 2026-11-10: Android platform sources use an SDK coordinate
+- `sdk.android:platform:<platformId>` is a source coordinate stored in the Android SDK, not the Gradle cache. Callers pass the platform id the same way they pass a Maven version, for example `sdk.android:platform:android-36` or `sdk.android:platform:36`.
+- A Gradle project and subproject are not required. `--android-home` / MCP `androidHome` selects the SDK. When omitted, ksrc uses `sdk.dir` then `android.dir` from `local.properties` in the project directory only, then `ANDROID_HOME`, then `ANDROID_SDK_ROOT`.
+- One coordinate has one root. `<sdk>/sources/<platformId>/` is that root when the directory exists. `platforms/<platformId>/android-stubs-src.jar` is used only when the directory is absent.
+- ksrc does not install SDK packages. Stub-only and missing trees warn with `android sdk install sources/<platformId>`.
+- Rationale: an agent already knows the compile SDK it is reading and asks for that coordinate directly. Discovery through the Gradle classpath would require a project and module that this dependency does not live in.
 
 ## 2026-05-12: KMP base selectors include Gradle-selected external variants
 - When a selector matches a resolved KMP base component, the init script inspects Gradle's resolved variant metadata and follows `ResolvedVariantResult.externalVariant` owners exposed from Gradle module metadata `available-at`.

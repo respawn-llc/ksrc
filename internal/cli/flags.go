@@ -5,6 +5,7 @@ import (
 	"github.com/respawn-app/ksrc/internal/gradle"
 	"github.com/respawn-app/ksrc/internal/resolution"
 	"github.com/respawn-app/ksrc/internal/resolve"
+	"github.com/spf13/cobra"
 )
 
 type ResolveFlags struct {
@@ -24,6 +25,7 @@ type ResolveFlags struct {
 	IncludeBuildscript    bool
 	IncludeIncludedBuilds bool
 	GradleUserHome        string
+	AndroidHome           string
 }
 
 func (f ResolveFlags) ToOptions() gradle.ResolveOptions {
@@ -70,9 +72,14 @@ func (f ResolveFlags) ToSpec(dep string, applyFilters bool, allowCacheFallback b
 		IncludeIncludedBuilds: f.IncludeIncludedBuilds,
 		Dep:                   dep,
 		GradleUserHome:        f.GradleUserHome,
+		AndroidHome:           f.AndroidHome,
 		ApplyFilters:          applyFilters,
 		AllowCacheFallback:    allowCacheFallback,
 	}
+}
+
+func BindAndroidHome(cmd *cobra.Command, dest *string) {
+	cmd.Flags().StringVar(dest, "android-home", "", "Android SDK directory for sdk.android:platform (default: local.properties sdk.dir, then ANDROID_HOME, then ANDROID_SDK_ROOT)")
 }
 
 func (f ResolveFlags) ToCacheOptions() resolve.CacheOptions {

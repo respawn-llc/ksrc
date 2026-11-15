@@ -195,7 +195,7 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 	searchDirs := make([]string, 0, len(opts.Jars))
 	seenDirs := make(map[string]struct{}, len(opts.Jars))
 	for _, j := range opts.Jars {
-		dir, err := extractJarCached(j.Path)
+		dir, err := searchRoot(j.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -237,6 +237,17 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 		return mapToSource(extractRoots, filePath)
 	})
 	return suppressSelectedByDuplicateMatches(parsed.Matches, selectedByCoordsByJarPath(extractedSources)), nil
+}
+
+func searchRoot(path string) (string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return path, nil
+	}
+	return extractJarCached(path)
 }
 
 func selectedByCoordsByJarPath(extractedSources []extractedSource) map[string][]resolve.Coord {
@@ -423,10 +434,14 @@ func extractCacheKey(src string) (string, error) {
 	// Gradle artifact caches are checksum-addressed, so a canonical path is the
 	// production identity we care about here. This keeps cache lookup at stat-free
 	// path normalization cost instead of re-hashing jar contents on every search.
-	// Tradeoff: if some non-Gradle workflow overwrites a jar in place at the same
-	// path, this cache will intentionally keep reusing the existing extraction.
+	// Android platform jars are the exception: the SDK replaces them in place and
+	// records the new bytes as Pkg.Revision in source.properties.
 	clean := filepath.Clean(abs)
-	sum := sha256.Sum256([]byte(clean))
+	identity := clean
+	if revision, ok := resolve.PlatformPackageRevision(clean); ok {
+		identity = clean + "\n" + revision
+	}
+	sum := sha256.Sum256([]byte(identity))
 	return fmt.Sprintf("%x", sum), nil
 }
 
