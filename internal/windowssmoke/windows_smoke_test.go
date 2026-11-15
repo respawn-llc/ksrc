@@ -31,6 +31,9 @@ func TestWindowsSmoke(t *testing.T) {
 	must(t, err)
 	root := filepath.Join(t.TempDir(), "windows smoke")
 	must(t, os.MkdirAll(root, 0o755))
+	// Go's temp path may contain 8.3 names; Gradle reports their long form.
+	root, err = filepath.EvalSymlinks(root)
+	must(t, err)
 	t.Setenv("KSRC_EXTRACT_CACHE_DIR", filepath.Join(root, "extracted sources"))
 	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(root, "file ids"))
 	t.Setenv("GRADLE_USER_HOME", filepath.Join(root, "unused environment home"))
