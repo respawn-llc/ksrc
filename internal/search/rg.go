@@ -254,7 +254,7 @@ func selectedByCoordsByJarPath(extractedSources []extractedSource) map[string][]
 const windowsCmdLineLimit = 32_767
 
 // rgCmdLineBudget leaves headroom below windowsCmdLineLimit for the executable
-// path and per-argument quoting.
+// path.
 const rgCmdLineBudget = 28_000
 
 // chunkSearchDirs splits search dirs so a single rg invocation stays within the
@@ -269,8 +269,55 @@ func chunkSearchDirs(baseArgs []string, dirs []string) [][]string {
 	if runtime.GOOS != "windows" {
 		return [][]string{dirs}
 	}
-	base := len(strings.Join(baseArgs, " "))
+	base := windowsArgsLen(baseArgs) + 1 // + separator before the first dir
 	return chunkByBudget(base, dirs, rgCmdLineBudget)
+}
+
+// windowsArgsLen returns the length of args as they appear on a Windows
+// command line: each argument escaped the way os/exec escapes it for
+// CreateProcessW, with single separators between arguments.
+func windowsArgsLen(args []string) int {
+	n := 0
+	for i, arg := range args {
+		if i > 0 {
+			n++ // argument separator
+		}
+		n += windowsArgLen(arg)
+	}
+	return n
+}
+
+// windowsArgLen mirrors the escaping os/exec applies per argument (MSVCRT
+// rules): empty becomes `""`; arguments containing spaces, tabs, quotes, or
+// backslashes are wrapped in quotes, each embedded quote is preceded by a
+// backslash (with immediately preceding backslashes doubled), and trailing
+// backslashes double before the closing quote.
+func windowsArgLen(arg string) int {
+	if arg == "" {
+		return 2
+	}
+	quoting := strings.ContainsAny(arg, " \t\"\\")
+	n := 0
+	if quoting {
+		n += 2
+	}
+	slashes := 0
+	for _, r := range arg {
+		n++
+		switch r {
+		case '\\':
+			slashes++
+		case '"':
+			n += slashes + 1 // doubling preceding backslashes plus the escape
+			slashes = 0
+		default:
+			slashes = 0
+		}
+	}
+	if quoting && slashes > 0 {
+		n += slashes // trailing backslashes double before the closing quote
+	}
+	return n
 }
 
 func chunkByBudget(baseLen int, dirs []string, budget int) [][]string {
@@ -278,7 +325,7 @@ func chunkByBudget(baseLen int, dirs []string, budget int) [][]string {
 	var cur []string
 	curLen := baseLen
 	for _, dir := range dirs {
-		cost := len(dir) + 3 // argument separator plus potential quoting
+		cost := len(dir) + 3 // argument separator plus surrounding quotes (absolute Windows paths always get quoted)
 		if curLen+cost > budget && len(cur) > 0 {
 			chunks = append(chunks, cur)
 			cur = nil
