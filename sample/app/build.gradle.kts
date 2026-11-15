@@ -3,12 +3,17 @@ plugins {
 }
 
 val androidCompileSdk = libs.versions.androidCompileSdk.get().toInt()
+val androidCompileSdkMinor = libs.versions.androidCompileSdkMinor.get().toInt()
 val androidMinSdk = libs.versions.androidMinSdk.get().toInt()
 val androidTargetSdk = libs.versions.androidTargetSdk.get().toInt()
 
 android {
     namespace = "com.example.ksrcsample.app"
-    compileSdk = androidCompileSdk
+    compileSdk {
+        version = release(androidCompileSdk) {
+            minorApiLevel = androidCompileSdkMinor
+        }
+    }
 
     defaultConfig {
         applicationId = "com.example.ksrcsample.app"
