@@ -147,13 +147,22 @@ func TestDeleteReportsFailuresAndContinues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(bad); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS == "windows" {
+		// Windows cannot delete a file opened without delete sharing.
+		held, err := os.Create(filepath.Join(bad, "held-open"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = held.Close() })
+	} else {
+		if err := os.Remove(bad); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(blocked); err != nil {
+			t.Fatal(err)
+		}
+		writeCacheFile(t, blocked, "keep")
 	}
-	if err := os.Remove(blocked); err != nil {
-		t.Fatal(err)
-	}
-	writeCacheFile(t, blocked, "keep")
 	err = Delete(context.Background(), folders)
 	if err == nil || !strings.Contains(err.Error(), strconv.Quote(bad)) {
 		t.Fatalf("missing failed path: %v", err)
