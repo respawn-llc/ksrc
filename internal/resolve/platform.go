@@ -1,10 +1,13 @@
 package resolve
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/magiconair/properties"
 )
 
 const (
@@ -83,18 +86,31 @@ func PlatformInstallCommand(platformID string) string {
 func FindAndroidSDK(explicit, projectDir string) (string, error) {
 	explicit = strings.TrimSpace(explicit)
 	if explicit != "" {
-		if !isDir(explicit) {
+		dir, err := filepath.Abs(explicit)
+		if err != nil {
+			return "", fmt.Errorf("resolve android SDK directory %q: %w", explicit, err)
+		}
+		if !isDir(dir) {
 			return "", fmt.Errorf("android SDK directory %q does not exist", explicit)
 		}
-		return explicit, nil
+		return dir, nil
 	}
-	if dir, ok := sdkFromLocalProperties(projectDir); ok {
+	if dir, ok, err := sdkFromLocalProperties(projectDir); err != nil {
+		return "", err
+	} else if ok {
 		return dir, nil
 	}
 	for _, env := range []string{"ANDROID_HOME", "ANDROID_SDK_ROOT"} {
 		dir := strings.TrimSpace(os.Getenv(env))
-		if dir != "" && isDir(dir) {
-			return dir, nil
+		if dir == "" {
+			continue
+		}
+		absolute, err := filepath.Abs(dir)
+		if err != nil {
+			return "", fmt.Errorf("resolve android SDK directory from %s: %w", env, err)
+		}
+		if isDir(absolute) {
+			return absolute, nil
 		}
 	}
 	return "", fmt.Errorf("android SDK not found. Pass --android-home or set ANDROID_HOME")
@@ -105,26 +121,29 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-func sdkFromLocalProperties(projectDir string) (string, bool) {
+func sdkFromLocalProperties(projectDir string) (string, bool, error) {
 	if strings.TrimSpace(projectDir) == "" {
 		projectDir = "."
 	}
 	dir, err := filepath.Abs(projectDir)
 	if err != nil {
-		return "", false
+		return "", false, fmt.Errorf("resolve project directory %q: %w", projectDir, err)
 	}
-	props := filepath.Join(dir, "local.properties")
-	if value, ok := readPropertiesValue(props, "sdk.dir"); ok {
-		if resolved, ok := resolveSDKPath(dir, value); ok {
-			return resolved, true
+	props, err := readProperties(filepath.Join(dir, "local.properties"))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	for _, key := range []string{"sdk.dir", "android.dir"} {
+		if value, ok := props.Get(key); ok {
+			if resolved, ok := resolveSDKPath(dir, value); ok {
+				return resolved, true, nil
+			}
 		}
 	}
-	if value, ok := readPropertiesValue(props, "android.dir"); ok {
-		if resolved, ok := resolveSDKPath(dir, value); ok {
-			return resolved, true
-		}
-	}
-	return "", false
+	return "", false, nil
 }
 
 func resolveSDKPath(base, value string) (string, bool) {
@@ -149,7 +168,11 @@ func PlatformPackageRevision(jarPath string) (string, bool) {
 	if filepath.Base(filepath.Dir(dir)) != "platforms" || !strings.HasPrefix(filepath.Base(dir), "android-") {
 		return "", false
 	}
-	value, ok := readPropertiesValue(filepath.Join(dir, "source.properties"), "Pkg.Revision")
+	props, err := readProperties(filepath.Join(dir, "source.properties"))
+	if err != nil {
+		return "", false
+	}
+	value, ok := props.Get("Pkg.Revision")
 	value = strings.TrimSpace(value)
 	if !ok || value == "" {
 		return "", false
@@ -157,50 +180,13 @@ func PlatformPackageRevision(jarPath string) (string, bool) {
 	return value, true
 }
 
-func readPropertiesValue(path, key string) (string, bool) {
-	data, err := os.ReadFile(path)
+func readProperties(path string) (*properties.Properties, error) {
+	loader := properties.Loader{Encoding: properties.UTF8, DisableExpansion: true}
+	props, err := loader.LoadFile(path)
 	if err != nil {
-		return "", false
+		return nil, fmt.Errorf("read properties %q: %w", path, err)
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(strings.TrimRight(line, "\r"))
-		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "!") {
-			continue
-		}
-		sep := strings.IndexAny(line, "=:")
-		if sep <= 0 {
-			continue
-		}
-		if strings.TrimSpace(line[:sep]) != key {
-			continue
-		}
-		value := unescapeProperties(strings.TrimSpace(line[sep+1:]))
-		value = strings.Trim(value, `"'`)
-		if value == "" {
-			return "", false
-		}
-		return value, true
-	}
-	return "", false
-}
-
-func unescapeProperties(value string) string {
-	var b strings.Builder
-	b.Grow(len(value))
-	for i := 0; i < len(value); i++ {
-		if value[i] != '\\' || i+1 == len(value) {
-			b.WriteByte(value[i])
-			continue
-		}
-		switch value[i+1] {
-		case '\\', ':', '=', ' ':
-			b.WriteByte(value[i+1])
-			i++
-		default:
-			b.WriteByte(value[i])
-		}
-	}
-	return b.String()
+	return props, nil
 }
 
 // PlatformLoad is the readable roots for one Android platform.
