@@ -1,6 +1,6 @@
 ## Context
 `ksrc` is a Go CLI for searching and reading Kotlin/Java dependency sources resolved from Gradle projects.
-It resolves dependencies via Gradle, ensures `-sources.jar` artifacts exist in Gradle caches, then uses `rg` for search and zip reads for `cat/open`.
+It resolves dependencies via Gradle, ensures `-sources.jar` artifacts exist in Gradle caches, then uses `rg` for search and zip reads for `cat`.
 The tool is designed for scriptable/agent workflows: stable output, file-id chaining, and zero mutation of the target project.
 
 Primary docs to keep aligned with code:

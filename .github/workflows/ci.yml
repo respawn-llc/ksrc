@@ -83,7 +83,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows search argument tests failed" }
           go test ./internal/gradle -run 'Test(FindGradle|WriteInitScript|InitScriptMatchesGolden)'
           if ($LASTEXITCODE -ne 0) { throw "Windows Gradle regression tests failed" }
-          go test ./internal/cli -run 'Test(Clean|Pager|.*AndroidPlatform|CatUsesFileIDCacheWithoutRediscoveringSDK)'
+          go test ./internal/cli -run 'Test(Clean|SourceReading|.*AndroidPlatform|CatUsesFileIDCacheWithoutRediscoveringSDK)'
           if ($LASTEXITCODE -ne 0) { throw "Windows CLI regression tests failed" }
           go test ./internal/mcpserver -run 'Test.*Platform'
           if ($LASTEXITCODE -ne 0) { throw "Windows Android MCP tests failed" }

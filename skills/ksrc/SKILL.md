@@ -77,9 +77,6 @@ Common flags:
 - `--lines <start,end>` 1‑based inclusive range
 - `--module <glob>` / `--group` / `--artifact` / `--version` to disambiguate when using a path
 
-### `ksrc open <file-id|path>`
-Open in `$PAGER` (defaults to `less -R`). Same flags as `cat`.
-
 ### `ksrc deps`
 List resolved dependencies and source availability.
 

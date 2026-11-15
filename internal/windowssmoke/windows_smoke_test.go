@@ -39,7 +39,7 @@ func TestWindowsSmoke(t *testing.T) {
 	t.Setenv("GRADLE_USER_HOME", filepath.Join(root, "unused environment home"))
 	// A persistent daemon holds its home open and prevents Windows temp cleanup.
 	t.Setenv("GRADLE_OPTS", "-Dorg.gradle.daemon=false")
-	t.Setenv("PAGER", "cat")
+	t.Setenv("PAGER", "ksrc-pager-must-not-run")
 
 	versionBytes, err := os.ReadFile(filepath.Join(repo, "VERSION"))
 	must(t, err)
@@ -134,12 +134,12 @@ func TestWindowsSmoke(t *testing.T) {
 		}
 		opened := healthy(t, "open", fileID, "--lines", lineRange)
 		if opened != content {
-			t.Fatalf("open via PAGER=cat returned %q, want %q", opened, content)
+			t.Fatalf("open alias returned %q, want %q", opened, content)
 		}
-		t.Run("native default pager", func(t *testing.T) {
-			t.Setenv("PAGER", "")
-			requireContains(t, healthy(t, "open", fileID, "--lines", lineRange), text)
-		})
+		numbered := healthy(t, "open", fileID, "--lines", lineRange, "-n")
+		if numbered != line+": "+content {
+			t.Fatalf("numbered open returned %q, want %q", numbered, line+": "+content)
+		}
 		located := healthy(t, "where", fileID)
 		requireContains(t, located, fileID+"|")
 		requireContains(t, located, home)

@@ -30,7 +30,6 @@ func NewRootCommand(app *App) *cobra.Command {
 
 	cmd.AddCommand(newSearchCmd(app))
 	cmd.AddCommand(newCatCmd(app))
-	cmd.AddCommand(newOpenCmd(app))
 	cmd.AddCommand(newDepsCmd(app))
 	cmd.AddCommand(newResolveCmd(app))
 	cmd.AddCommand(newFetchCmd(app))

@@ -15,7 +15,7 @@ foreach ($tool in @('go', 'java', 'rg')) {
     Get-Command $tool -ErrorAction Stop | Out-Null
 }
 
-# Use Git's sh/cat for the documented PAGER workflow, never WSL's bash.
+# Use Git's Unix utilities for install.sh, never WSL's shell.
 $previousPath = $env:PATH
 $env:PATH = "$(Join-Path $env:ProgramFiles 'Git\usr\bin');$env:PATH"
 $previousSmoke = $env:KSRC_WINDOWS_SMOKE

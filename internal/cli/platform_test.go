@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -219,10 +218,6 @@ func TestCachedAndroidPlatformFollowupWarnsAfterSourcesUninstalled(t *testing.T)
 		t.Run(command, func(t *testing.T) {
 			t.Setenv("ANDROID_HOME", "")
 			t.Setenv("ANDROID_SDK_ROOT", "")
-			t.Setenv("PAGER", "cat")
-			if runtime.GOOS == "windows" {
-				t.Setenv("PAGER", "more")
-			}
 			sdk := writeAndroidSDK(t, true)
 			fullSources := filepath.Join(sdk, "sources", "android-36")
 			fileID := "sdk.android:platform:android-36!/android/app/Activity.java"

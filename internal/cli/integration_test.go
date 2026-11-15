@@ -718,7 +718,6 @@ func TestOpenFileIDHonorsExplicitProjectAndStaleTrackedLocation(t *testing.T) {
 
 	t.Setenv("KSRC_TEST_JAR", firstJar)
 	t.Setenv("KSRC_FILEID_CACHE_DIR", filepath.Join(t.TempDir(), "fileid-cache"))
-	t.Setenv("PAGER", "cat")
 
 	whereOut, err := runCommand(app, []string{"where", inner, "--module", "org.jetbrains.kotlinx:kotlinx-datetime", "--project", projectDirA})
 	if err != nil {

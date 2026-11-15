@@ -97,27 +97,13 @@ When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses 
 - `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
 - `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
 - `--lines <start,end>`: Output a line range (1‑based, inclusive; sed‑style)
+- `-n, --line-numbers`: Prefix each output line with its original source line number, formatted as `N: text`.
 
 ---
 
 ### `ksrc open <file-id|path>`
-Open a file in `$PAGER` (defaults to `less -R`).
 
-**Usage**
-```
-ksrc open <file-id|path> [flags]
-```
-
-When `<file-id>` comes from `ksrc search` or `ksrc where <path>`, `ksrc` reuses the tracked backing jar path first. If that mapping is unavailable, it falls back to exact Gradle cache lookup, then project-aware resolution.
-
-**Flags**
-- `--project <path>`
-- `--module <glob>` (disambiguate)
-- `--gradle-user-home <path>`: Gradle user home (default: `GRADLE_USER_HOME` or `~/.gradle`)
-- `--buildsrc`: Include buildSrc dependencies (default: `true`; set `--buildsrc=false` to disable)
-- `--buildscript`: Include buildscript classpath deps (default: `true`; set `--buildscript=false` to disable)
-- `--include-builds`: Include composite builds (includeBuild) (default: `true`; set `--include-builds=false` to disable)
-- `--lines <start,end>`: Output a line range (1‑based, inclusive; sed‑style)
+Alias for [`ksrc cat`](#ksrc-cat-file-idpath). Prints plaintext with the same flags and output format.
 
 ---
 

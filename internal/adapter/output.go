@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -9,6 +10,27 @@ import (
 	"github.com/respawn-llc/ksrc/internal/resolve"
 	"github.com/respawn-llc/ksrc/internal/search"
 )
+
+func WriteSourceText(w io.Writer, data []byte, firstLine int, lineNumbers bool) error {
+	if !lineNumbers {
+		_, err := w.Write(data)
+		return err
+	}
+	for len(data) > 0 {
+		line, rest, newline := bytes.Cut(data, []byte{'\n'})
+		if _, err := fmt.Fprintf(w, "%d: %s", firstLine, line); err != nil {
+			return err
+		}
+		if newline {
+			if _, err := io.WriteString(w, "\n"); err != nil {
+				return err
+			}
+		}
+		data = rest
+		firstLine++
+	}
+	return nil
+}
 
 func FormatRGArgs(plan search.ExecPlan) string {
 	args := plan.Args
