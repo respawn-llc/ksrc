@@ -39,17 +39,18 @@ func FileIDRoot() (string, error) {
 
 // Roots includes older cache versions and the extraction fallback, even when
 // environment overrides redirect current writes elsewhere.
+// If the user cache directory is unavailable, the returned roots still include
+// the fallback and overrides; the error is a diagnostic for the omitted location.
 func Roots() ([]string, error) {
 	roots := []string{filepath.Dir(TempExtractRoot())}
 	base, err := os.UserCacheDir()
-	if err != nil {
-		return nil, err
+	if err == nil {
+		roots = append(roots, filepath.Join(base, "ksrc"))
 	}
-	roots = append(roots, filepath.Join(base, "ksrc"))
 	for _, env := range []string{ExtractDirEnv, FileIDDirEnv} {
 		if dir := strings.TrimSpace(os.Getenv(env)); dir != "" {
 			roots = append(roots, dir)
 		}
 	}
-	return roots, nil
+	return roots, err
 }

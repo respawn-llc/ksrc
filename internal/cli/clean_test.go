@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -145,5 +146,44 @@ func TestCleanRejectsExtraArguments(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 	if err := cmd.Execute(); err == nil {
 		t.Fatal("accepted an arbitrary cleanup path")
+	}
+}
+
+func TestCleanWarnsAndCleansFallbackWithoutUserCacheDirectory(t *testing.T) {
+	custom := isolateCleanCaches(t)
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("LocalAppData", "")
+	case "darwin":
+		t.Setenv("HOME", "")
+	default:
+		t.Setenv("HOME", "")
+		t.Setenv("XDG_CACHE_HOME", "")
+	}
+	if _, err := os.UserCacheDir(); err == nil {
+		t.Skip("platform can resolve user cache without environment")
+	}
+	fallback := filepath.Join(cache.TempExtractRoot(), "entry")
+	if err := os.MkdirAll(filepath.Dir(fallback), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fallback, []byte("123"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := newCleanCmd()
+	cmd.SetArgs([]string{"--yes"})
+	var out, stderr bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&stderr)
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stderr.String(), "user cache directory unavailable") {
+		t.Fatalf("missing diagnostic: %s", &stderr)
+	}
+	for _, path := range []string{custom, fallback} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("cache %q remains: %v", path, err)
+		}
 	}
 }

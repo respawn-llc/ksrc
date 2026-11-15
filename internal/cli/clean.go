@@ -35,7 +35,7 @@ func cleanCaches(cmd *cobra.Command, dryRun, yes, interactive bool) error {
 	}
 	roots, err := cache.Roots()
 	if err != nil {
-		return err
+		fmt.Fprintf(cmd.ErrOrStderr(), "Warning: user cache directory unavailable: %v; scanning remaining ksrc cache locations.\n", err)
 	}
 	folders, err := cache.Inspect(cmd.Context(), roots)
 	if err != nil {

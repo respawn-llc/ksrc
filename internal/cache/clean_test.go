@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,7 @@ func TestInspectAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(folders, []Folder{{Path: first, Bytes: 8}}) {
+	if len(folders) != 1 || folders[0].Path != first || folders[0].Bytes != 8 {
 		t.Fatalf("folders = %+v", folders)
 	}
 	if _, err := os.Stat(first); err != nil {
@@ -125,16 +126,113 @@ func TestRootsIncludeDefaultsAndOverrides(t *testing.T) {
 
 func TestDeleteReportsFailuresAndContinues(t *testing.T) {
 	base := t.TempDir()
-	blocked := filepath.Join(base, "not-a-directory")
-	writeCacheFile(t, blocked, "keep")
+	blocked := filepath.Join(base, "blocked-parent")
+	bad := filepath.Join(blocked, "cache")
+	if err := os.MkdirAll(bad, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	good := filepath.Join(base, "cache")
 	writeCacheFile(t, filepath.Join(good, "remove"), "123")
-	bad := filepath.Join(blocked, "cache")
-	err := Delete(context.Background(), []Folder{{Path: bad}, {Path: good}})
+	folders, err := Inspect(context.Background(), []string{bad, good})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(bad); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(blocked); err != nil {
+		t.Fatal(err)
+	}
+	writeCacheFile(t, blocked, "keep")
+	err = Delete(context.Background(), folders)
 	if err == nil || !strings.Contains(err.Error(), bad) {
 		t.Fatalf("missing failed path: %v", err)
 	}
 	if _, err := os.Stat(good); !os.IsNotExist(err) {
 		t.Fatalf("did not continue after failure: %v", err)
+	}
+}
+
+func TestInspectRejectsSharedDirectoryThroughSymlinkedParent(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "user", "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(filepath.Dir(home), link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	path := filepath.Join(link, filepath.Base(home))
+	if _, err := Inspect(context.Background(), []string{path}); err == nil {
+		t.Fatal("accepted home directory through a symlinked parent")
+	}
+}
+
+func TestDeleteRejectsRetargetedParentSymlink(t *testing.T) {
+	base := t.TempDir()
+	first, second := filepath.Join(base, "first"), filepath.Join(base, "second")
+	for _, parent := range []string{first, second} {
+		writeCacheFile(t, filepath.Join(parent, "cache", "keep"), "123")
+	}
+	link := filepath.Join(base, "link")
+	if err := os.Symlink(first, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	folders, err := Inspect(context.Background(), []string{filepath.Join(link, "cache")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(second, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := Delete(context.Background(), folders); err == nil {
+		t.Fatal("deleted through a retargeted parent")
+	}
+	for _, parent := range []string{first, second} {
+		if _, err := os.Stat(filepath.Join(parent, "cache", "keep")); err != nil {
+			t.Fatalf("deleted unconfirmed files: %v", err)
+		}
+	}
+}
+
+func TestCleanFallbackWhenUserCacheDirUnavailable(t *testing.T) {
+	temp := t.TempDir()
+	t.Setenv("TMPDIR", temp)
+	t.Setenv("TMP", temp)
+	t.Setenv("TEMP", temp)
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("LocalAppData", "")
+	case "darwin":
+		t.Setenv("HOME", "")
+	default:
+		t.Setenv("HOME", "")
+		t.Setenv("XDG_CACHE_HOME", "")
+	}
+	if _, err := os.UserCacheDir(); err == nil {
+		t.Skip("platform can resolve user cache without environment")
+	}
+	t.Setenv(ExtractDirEnv, "")
+	t.Setenv(FileIDDirEnv, "")
+	file := filepath.Join(TempExtractRoot(), "entry")
+	writeCacheFile(t, file, "123")
+	roots, _ := Roots()
+	folders, err := Inspect(context.Background(), roots)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(folders) != 1 || folders[0].Bytes != 3 {
+		t.Fatalf("fallback missing from preview: %+v", folders)
+	}
+	if err := Delete(context.Background(), folders); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(file); !os.IsNotExist(err) {
+		t.Fatalf("fallback not cleaned: %v", err)
 	}
 }
