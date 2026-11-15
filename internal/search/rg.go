@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -212,28 +213,27 @@ func runExtractSearch(ctx context.Context, runner executil.Runner, opts Options)
 	args = append(args, opts.RGArgs...)
 	args = append(args, "--")
 	args = append(args, opts.Pattern)
-	args = append(args, searchDirs...)
 
-	if opts.Report != nil {
-		opts.Report(ExecPlan{
-			Cmd:      "rg",
-			Args:     args,
-			JarCount: len(opts.Jars),
-			Mode:     "extract",
-			WorkDir:  opts.WorkDir,
-		})
-	}
-	stdout, stderr, err := runner.Run(ctx, opts.WorkDir, "rg", args...)
-	if err != nil {
-		if isNoMatches(err) {
-			return nil, nil
+	var stdoutBuf strings.Builder
+	for _, dirs := range chunkSearchDirs(args, searchDirs) {
+		chunkArgs := append(append([]string{}, args...), dirs...)
+		if opts.Report != nil {
+			opts.Report(ExecPlan{
+				Cmd:      "rg",
+				Args:     chunkArgs,
+				JarCount: len(opts.Jars),
+				Mode:     "extract",
+				WorkDir:  opts.WorkDir,
+			})
 		}
-		if strings.TrimSpace(stdout) == "" {
+		stdout, stderr, err := runner.Run(ctx, opts.WorkDir, "rg", chunkArgs...)
+		if err != nil && !isNoMatches(err) && strings.TrimSpace(stdout) == "" {
 			return nil, fmt.Errorf("rg failed: %w\n%s", err, strings.TrimSpace(stderr))
 		}
+		stdoutBuf.WriteString(stdout)
 	}
 
-	parsed := parseRgOutput(stdout, func(filePath string) (resolve.SourceJar, string, bool) {
+	parsed := parseRgOutput(stdoutBuf.String(), func(filePath string) (resolve.SourceJar, string, bool) {
 		return mapToSource(extractRoots, filePath)
 	})
 	return suppressSelectedByDuplicateMatches(parsed.Matches, selectedByCoordsByJarPath(extractedSources)), nil
@@ -248,6 +248,49 @@ func selectedByCoordsByJarPath(extractedSources []extractedSource) map[string][]
 		coordsByJarPath[extracted.Source.Path] = append(coordsByJarPath[extracted.Source.Path], extracted.Source.SelectedBy...)
 	}
 	return coordsByJarPath
+}
+
+// windowsCmdLineLimit is the CreateProcess command-line limit on Windows.
+const windowsCmdLineLimit = 32_767
+
+// rgCmdLineBudget leaves headroom below windowsCmdLineLimit for the executable
+// path and per-argument quoting.
+const rgCmdLineBudget = 28_000
+
+// chunkSearchDirs splits search dirs so a single rg invocation stays within the
+// platform command-line limits. Windows CreateProcess caps the command line at
+// 32,767 chars and each extracted dir path is ~85 chars, so a few hundred
+// dependencies exceed the cap and fork/exec fails with "filename or extension
+// is too long". Other platforms have no practical limit here.
+func chunkSearchDirs(baseArgs []string, dirs []string) [][]string {
+	if len(dirs) == 0 {
+		return [][]string{nil}
+	}
+	if runtime.GOOS != "windows" {
+		return [][]string{dirs}
+	}
+	base := len(strings.Join(baseArgs, " "))
+	return chunkByBudget(base, dirs, rgCmdLineBudget)
+}
+
+func chunkByBudget(baseLen int, dirs []string, budget int) [][]string {
+	var chunks [][]string
+	var cur []string
+	curLen := baseLen
+	for _, dir := range dirs {
+		cost := len(dir) + 3 // argument separator plus potential quoting
+		if curLen+cost > budget && len(cur) > 0 {
+			chunks = append(chunks, cur)
+			cur = nil
+			curLen = baseLen
+		}
+		cur = append(cur, dir)
+		curLen += cost
+	}
+	if len(cur) > 0 {
+		chunks = append(chunks, cur)
+	}
+	return chunks
 }
 
 type duplicateMatchKey struct {
