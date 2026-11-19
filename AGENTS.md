@@ -77,7 +77,7 @@ go test -cover ./...
 ## Dev environment tips
 - Build output version is injected from `VERSION` via ldflags; without that, CLI reports `dev`.
 - Keep `./bin/ksrc` current if your local shell/tooling points to it.
-- Keep `.claude-plugin/plugin.json` and `plugin.json` versions aligned with `VERSION`. The Codex marketplace is `.agents/plugins/marketplace.json`. Both plugins share `skills/ksrc/SKILL.md`.
+- Keep `.claude-plugin/plugin.json` and `plugin.json` versions aligned with `VERSION`. The Codex marketplace is `.agents/plugins/marketplace.json`. The Grok marketplace is `.grok-plugin/marketplace.json` and points at `plugins/ksrc`; neither that index nor `plugins/ksrc/.grok-plugin/plugin.json` has a version field. All three plugins share one skill: `skills/ksrc` is a symlink to `plugins/ksrc/skills/ksrc`.
 
 ## Architecture Notes
 - Keep command wiring thin in `internal/cli` and `internal/mcpserver`; keep shared source-tool behavior in `internal/adapter` and domain behavior in `resolution`, `gradle`, `resolve`, `search`, and `cat`.
