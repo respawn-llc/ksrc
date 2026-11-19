@@ -1,0 +1,13 @@
+{
+  "name": "ksrc",
+  "description": "Search and read Gradle dependency sources",
+  "owner": { "name": "Respawn" },
+  "plugins": [
+    {
+      "name": "ksrc",
+      "description": "Ksrc CLI skill for searching/reading Kotlin dependency sources",
+      "category": "Developer Tools",
+      "source": "./plugins/ksrc"
+    }
+  ]
+}

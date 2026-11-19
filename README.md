@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/respawn-llc/ksrc/main/scripts/insta
 
 ## 2. Teach agents how to use it
 
-Next up, install the claude code plugin/skill, to let your agents know they _can_ use `ksrc` and how to use it.
+Next, install the plugin or skill so agents know they can use `ksrc` and how to use it. The `ksrc` binary above is still required.
 
 ### Claude Code
 
@@ -54,6 +54,15 @@ Install the skill-only plugin:
 ```bash
 codex plugin marketplace add respawn-llc/ksrc
 codex plugin add ksrc@ksrc
+```
+
+### Grok Build
+
+Install the skill-only plugin. `--trust` loads it. That is the whole agent setup: the skill already knows which searches go through `ksrc` and which settings it uses. Do not add a project MCP entry or an `AGENTS.md` prompt for an agent that has a shell.
+
+```bash
+grok plugin marketplace add respawn-llc/ksrc
+grok plugin install ksrc --trust
 ```
 
 ### MCP (Model Context Protocol)

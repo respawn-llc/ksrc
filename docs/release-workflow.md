@@ -7,6 +7,8 @@ This document describes how a release is cut, what must be bumped, and what auto
 - Version source: `VERSION`
 - Claude plugin version: `.claude-plugin/plugin.json`
 - Codex plugin version: `plugin.json`
+- Grok marketplace index: `.grok-plugin/marketplace.json` (source `./plugins/ksrc`; no version field)
+- Grok plugin manifest: `plugins/ksrc/.grok-plugin/plugin.json` (no version field; the release workflow does not bump either Grok file)
 - Release workflow: `.github/workflows/release.yml`
 - Tap update script: `scripts/update-brew-tap.sh`
 - Homebrew tap repo (separate): `../homebrew-tap` or https://github.com/respawn-llc/homebrew-tap.
@@ -21,6 +23,7 @@ This document describes how a release is cut, what must be bumped, and what auto
    - This becomes the tag `vX.Y.Z` and the CLI version.
 2. `.claude-plugin/plugin.json` and `plugin.json`
    - Keep plugin version aligned with the release version.
+   - `.grok-plugin/marketplace.json` and `plugins/ksrc/.grok-plugin/plugin.json` have no version field. Leave them out of the version bump.
 
 Optional (as needed):
 - Update docs in `docs/` and skills in `skills/` when CLI flags, outputs, APIs or formats change.

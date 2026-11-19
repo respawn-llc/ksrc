@@ -1,0 +1,4 @@
+{
+  "name": "ksrc",
+  "description": "Ksrc CLI skill for searching/reading Kotlin dependency sources"
+}
